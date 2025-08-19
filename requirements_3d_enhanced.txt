@@ -1,0 +1,39 @@
+# requirements_3d_enhanced.txt
+# Phần mềm Tính toán Băng tải Công Nghiệp - 3D Enhanced Version
+
+# Core dependencies (unchanged)
+PySide6>=6.6
+matplotlib>=3.8
+pandas>=2.2
+numpy>=1.26
+openpyxl>=3.1
+XlsxWriter>=3.2
+fpdf2>=2.7
+scipy
+argon2-cffi>=23.1.0
+platformdirs>=4.2.0
+cryptography>=42.0.0
+
+# RAG and AI dependencies
+google-generativeai>=0.3.0
+faiss-cpu>=1.7.4
+PyMuPDF>=1.23.8  # for PDF processing
+python-dotenv>=1.0.0
+sentence-transformers>=2.4.0  # for text embeddings
+# 3D Visualization dependencies
+PySide6>=6.8
+# Không dùng extras [webengine], không có gói PySide6-WebEngine trên pip
+
+
+# Optional: Enhanced 3D features
+Pillow>=10.0               # Image processing for screenshots
+requests>=2.31             # For downloading 3D assets if needed
+
+# Development and testing
+pytest>=7.4                # For testing 3D components
+pytest-qt>=4.2             # Qt-specific testing
+
+# Note: Cài đặt
+# 1. Cài đặt cơ bản: pip install -r requirements_3d_enhanced.txt
+# 2. Nếu gặp lỗi WebEngine: pip install PySide6-WebEngine
+# 3. Trên Linux có thể cần: sudo apt-get install qt6-webengine-dev
