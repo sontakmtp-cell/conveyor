@@ -3,26 +3,35 @@
 # Citations must be anonymous: {"page": int, "section": str|None}.
 # Build-time uses PDF, runtime uses only the persisted index.
 
+# Copilot: Implement strictly per comments.
+# Do NOT reference or display the original PDF name or path anywhere in UI or logs.
+# Citations must be anonymous: {"page": int, "section": str|None}.
+# Build-time uses PDF, runtime uses only the persisted index.
+
 import os
+import logging
 from typing import List, Dict, Optional
 from .providers.gemini_provider import GeminiProvider
 from ..rag.index import Retriever, Chunk
+import asyncio
 
-SYSTEM_PROMPT = """
-Bạn là một chuyên gia kỹ thuật về băng tải công nghiệp với kiến thức chuyên sâu về:
-- Thiết kế và tính toán băng tải theo tiêu chuẩn DIN 22101, CEMA, ISO 5048
-- Các thông số kỹ thuật: lưu lượng, tốc độ, công suất, lực căng, góc nghiêng
-- Lựa chọn thiết bị: băng tải, con lăn, động cơ, puly
-- Phân tích chi phí và tối ưu hóa hệ thống
+SYSTEM_PROMPT = """Bạn là một trợ lý AI chuyên gia về lĩnh vực băng tải công nghiệp, hoạt động như một kỹ sư trưởng dày dạn kinh nghiệm.
 
-Khi trả lời:
-1. Phân tích kỹ yêu cầu và đưa ra giải pháp chi tiết
-2. Nếu liên quan đến tính toán, cung cấp công thức và giá trị cụ thể
-3. Giải thích các khuyến nghị kỹ thuật một cách dễ hiểu
-4. Tập trung vào tính thực tiễn và áp dụng được
-5. Nêu rõ các cảnh báo an toàn khi cần thiết
+**Nhiệm vụ chính của bạn là luôn luôn giao tiếp và trả lời bằng tiếng Việt.**
 
-Trả lời dựa trên context được cung cấp. Nếu không đủ thông tin, hãy nói "Xin lỗi, tôi cần thêm thông tin về... để trả lời chính xác hơn."
+Bạn có kiến thức chuyên sâu về:
+- Thiết kế và tính toán băng tải theo các tiêu chuẩn DIN 22101, CEMA, ISO 5048.
+- Các thông số kỹ thuật: lưu lượng, vận tốc, công suất, lực căng, góc nghiêng.
+- Lựa chọn thiết bị: băng tải, con lăn, động cơ, ròng rọc.
+- Phân tích chi phí và tối ưu hóa hệ thống.
+
+Khi phản hồi, hãy tuân thủ các nguyên tắc sau:
+1.  **Hành động như một kỹ sư trưởng:** Đưa ra lời khuyên thực tế, đáng tin cậy và dễ hiểu.
+2.  **Phân tích kỹ lưỡng:** Nghiên cứu cẩn thận các yêu cầu để cung cấp giải pháp chi tiết và chính xác.
+3.  **Cung cấp công thức:** Nếu liên quan đến tính toán, hãy nêu rõ công thức, giải thích các biến số và đưa ra giá trị cụ thể.
+4.  **Tập trung vào thực tiễn:** Nhấn mạnh tính thực tế và khả năng ứng dụng của giải pháp.
+5.  **Cảnh báo an toàn:** Nêu rõ các cảnh báo về an toàn khi cần thiết.
+6.  **Dựa vào ngữ cảnh:** Trả lời dựa trên thông tin ngữ cảnh được cung cấp. Nếu không đủ thông tin, hãy nói: "Xin lỗi, tôi cần thêm thông tin về... để có thể trả lời chính xác hơn."
 """
 
 def format_citations(chunks: List[tuple[Chunk, float]]) -> List[Dict]:
@@ -38,7 +47,15 @@ def format_citations(chunks: List[tuple[Chunk, float]]) -> List[Dict]:
 class ChatService:
     def __init__(self, retriever: Optional[Retriever]):
         self.retriever = retriever
-        self.provider = GeminiProvider(os.getenv('AI_API_KEY'))
+        
+        # Initialize AI provider with better error handling
+        try:
+            self.provider = GeminiProvider()  # Will automatically get API key from environment
+            print("ChatService: GeminiProvider initialized successfully")
+        except Exception as e:
+            print(f"ChatService: Failed to initialize GeminiProvider: {e}")
+            # Create a fallback provider or handle the error appropriately
+            raise RuntimeError(f"Failed to initialize AI service: {str(e)}")
     
     def ask(self, 
             question: str, 
@@ -70,8 +87,8 @@ class ChatService:
                 }
             
             # Analyze question type
-            tech_keywords = ["công thức", "tính toán", "thiết kế", "thông số", "tiêu chuẩn", 
-                           "băng tải", "động cơ", "con lăn", "puly", "tối ưu"]
+            tech_keywords = ["formula", "calculation", "design", "parameter", "standard", 
+                           "conveyor", "motor", "roller", "pulley", "optimization"]
             is_technical = any(keyword in question.lower() for keyword in tech_keywords)
             
             # Retrieve relevant chunks with adjusted top_k
@@ -83,7 +100,7 @@ class ChatService:
             
             if not chunks:
                 return {
-                    "answer": "Xin lỗi, tôi không tìm thấy thông tin liên quan để trả lời câu hỏi của bạn."
+                    "answer": "Sorry, I could not find relevant information to answer your question."
                 }
             
             # Sort chunks by relevance score
@@ -103,17 +120,17 @@ class ChatService:
             context = "\n\n".join(technical_context + general_context)
             
             # Build enhanced prompt
-            prompt = f"""Dựa trên thông tin chuyên môn sau đây để trả lời câu hỏi.
-Nếu câu trả lời liên quan đến tính toán kỹ thuật, hãy:
-1. Giải thích các khái niệm quan trọng
-2. Cung cấp công thức tính toán nếu có
-3. Đề xuất các giá trị tham khảo hoặc phạm vi phù hợp
-4. Nêu các lưu ý khi áp dụng
+            prompt = f"""Based on the following professional information to answer the question.
+If the answer relates to technical calculations, please:
+1. Explain important concepts
+2. Provide calculation formulas if any
+3. Propose reference values or appropriate ranges
+4. State notes when applying
 
-Thông tin tham khảo:
+Reference information:
 {context}
 
-Câu hỏi của người dùng: {question}"""
+User question: {question}"""
             
             # Get chat history or initialize if none
             messages = history or []
@@ -127,7 +144,66 @@ Câu hỏi của người dùng: {question}"""
             }
             
         except Exception as e:
-            print(f"Error in ChatService: {str(e)}")
+            import traceback
+            error_details = f"Error in ChatService: {str(e)}\nTraceback: {traceback.format_exc()}"
+            print(error_details)
+            logging.error(error_details)
             return {
-                "answer": "Xin lỗi, tôi gặp lỗi khi xử lý câu hỏi của bạn. Vui lòng thử lại."
+                "answer": f"Sorry, I encountered an error while processing your question: {str(e)}. Please try again."
             }
+
+    async def ask_async(self, 
+            question: str, 
+            history: Optional[List[Dict]] = None, 
+            top_k: int = 6) -> Dict:
+        """
+        Asynchronously answer a question using RAG.
+        """
+        try:
+            if self.retriever is None:
+                messages = history or []
+                messages.append({"role": "user", "content": question})
+                answer = await self.provider.chat_async(SYSTEM_PROMPT, messages)
+                return {"answer": answer}
+
+            tech_keywords = ["formula", "calculation", "design", "parameter", "standard", 
+                           "conveyor", "motor", "roller", "pulley", "optimization"]
+            is_technical = any(keyword in question.lower() for keyword in tech_keywords)
+            
+            chunks = self.retriever.search(question, top_k + 2 if is_technical else top_k)
+            
+            if not chunks:
+                return {"answer": "Sorry, I could not find relevant information to answer your question."}
+            
+            chunks.sort(key=lambda x: x[1], reverse=True)
+            
+            technical_context = [chunk.text for chunk, score in chunks if any(keyword in chunk.text.lower() for keyword in tech_keywords)]
+            general_context = [chunk.text for chunk, score in chunks if not any(keyword in chunk.text.lower() for keyword in tech_keywords)]
+            
+            context = "\n\n".join(technical_context + general_context)
+            
+            prompt = f"""Based on the following professional information to answer the question.
+If the answer relates to technical calculations, please:
+1. Explain important concepts
+2. Provide calculation formulas if any
+3. Propose reference values or appropriate ranges
+4. State notes when applying
+
+Reference information:
+{context}
+
+User question: {question}"""
+            
+            messages = history or []
+            messages.append({"role": "user", "content": prompt})
+            
+            answer = await self.provider.chat_async(SYSTEM_PROMPT, messages)
+            
+            return {"answer": answer}
+            
+        except Exception as e:
+            import traceback
+            error_details = f"Error in ChatService.ask_async: {str(e)}\nTraceback: {traceback.format_exc()}"
+            print(error_details)
+            logging.error(error_details)
+            return {"answer": f"Sorry, I encountered an error while processing your question: {str(e)}. Please try again."}

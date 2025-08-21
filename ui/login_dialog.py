@@ -59,10 +59,46 @@ class CreateAccountDialog(QDialog):
 def get_resource_path(relative_path: str) -> str:
     """Lấy đường dẫn tuyệt đối đến tài nguyên."""
     try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    return os.path.join(base_path, relative_path)
+        # Thử import resource_path từ core.utils.paths
+        try:
+            from core.utils.paths import resource_path
+            return resource_path(relative_path)
+        except ImportError:
+            pass
+        
+        # Fallback 1: PyInstaller _MEIPASS bundle
+        try:
+            if hasattr(sys, '_MEIPASS'):
+                base_path = sys._MEIPASS
+                full_path = os.path.join(base_path, relative_path)
+                if os.path.exists(full_path):
+                    return full_path
+        except Exception:
+            pass
+        
+        # Fallback 2: Relative to script location
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        script_path = os.path.join(script_dir, "..", relative_path)
+        if os.path.exists(script_path):
+            return script_path
+            
+        # Fallback 3: Current working directory
+        cwd_path = os.path.join(os.getcwd(), relative_path)
+        if os.path.exists(cwd_path):
+            return cwd_path
+            
+        # Fallback 4: Absolute path from project root
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        project_path = os.path.join(project_root, relative_path)
+        if os.path.exists(project_path):
+            return project_path
+            
+        # Nếu không tìm thấy, trả về đường dẫn gốc
+        return relative_path
+        
+    except Exception as e:
+        print(f"Warning: Error in get_resource_path for {relative_path}: {e}")
+        return relative_path
 
 class LoginDialog(QDialog):
     def __init__(self, parent=None):

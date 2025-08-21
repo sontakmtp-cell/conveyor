@@ -1,10 +1,89 @@
 # -*- coding: utf-8 -*-
 import pandas as pd
+import json
+import os
 from typing import Tuple, Dict
 from .specs import ACTIVE_MATERIAL_DB, ACTIVE_BELT_SPECS
+from .security import encryption
+from .utils.paths import resource_path
 
 REQUIRED_MAT_COLS = ["name","density","angle_repose","v_max","abrasive","temperature_max","moisture","corrosive"]
 REQUIRED_BELT_COLS = ["type","strength","elongation","temp_max","layers","T_allow_Npm"]
+
+class AccountsManager:
+    """Quản lý tài khoản người dùng với mã hóa"""
+    
+    def __init__(self):
+        self.db_path = resource_path("data/accounts.v1.json")
+        self.accounts = {}
+        self.load_accounts()
+    
+    def load_accounts(self):
+        """Tải danh sách tài khoản từ file đã mã hóa"""
+        try:
+            if os.path.exists(self.db_path):
+                with open(self.db_path, 'r', encoding='utf-8') as f:
+                    encrypted_data = f.read()
+                
+                # Giải mã dữ liệu
+                self.accounts = encryption.decrypt_data(encrypted_data) or {}
+            else:
+                self.accounts = {}
+                self.save_accounts()
+        except Exception as e:
+            try:
+                print(f"Lỗi tải tài khoản: {e}")
+            except UnicodeEncodeError:
+                print(f"Error loading accounts: {e}".encode('ascii', 'replace').decode('ascii'))
+            self.accounts = {}
+    
+    def save_accounts(self):
+        """Lưu danh sách tài khoản với mã hóa"""
+        try:
+            # Tạo thư mục nếu chưa có
+            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+            
+            # Mã hóa dữ liệu trước khi lưu
+            encrypted_data = encryption.encrypt_data(self.accounts)
+            
+            with open(self.db_path, 'w', encoding='utf-8') as f:
+                f.write(encrypted_data)
+            
+            return True
+        except Exception as e:
+            print(f"Lỗi lưu tài khoản: {e}")
+            return False
+    
+    def add_account(self, username: str, password: str, role: str = "user"):
+        """Thêm tài khoản mới"""
+        self.accounts[username] = {
+            "password": password,
+            "role": role,
+            "created_at": str(pd.Timestamp.now())
+        }
+        return self.save_accounts()
+    
+    def verify_account(self, username: str, password: str) -> bool:
+        """Xác thực tài khoản"""
+        if username in self.accounts:
+            return self.accounts[username]["password"] == password
+        return False
+    
+    def get_account_role(self, username: str) -> str:
+        """Lấy vai trò của tài khoản"""
+        if username in self.accounts:
+            return self.accounts[username].get("role", "user")
+        return "guest"
+    
+    def remove_account(self, username: str) -> bool:
+        """Xóa tài khoản"""
+        if username in self.accounts:
+            del self.accounts[username]
+            return self.save_accounts()
+        return False
+
+# Instance mặc định để sử dụng trong toàn bộ ứng dụng
+accounts_manager = AccountsManager()
 
 def load_database(path: str) -> Tuple[Dict, Dict, str]:
     """

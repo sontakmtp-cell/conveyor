@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QMessageBox,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QPaintEvent, QPixmap, QPalette, QBrush, QPainter
 
 from core.licensing import assigned_account_id, verify_input, write_activation
@@ -16,24 +16,24 @@ from core.licensing import assigned_account_id, verify_input, write_activation
 
 def get_resource_path(relative_path: str) -> str:
     """Lấy đường dẫn tuyệt đối đến tài nguyên, hỗ trợ cả development và PyInstaller exe."""
-    # Normalize path separators for cross-platform compatibility
-    relative_path = relative_path.replace("\\", "/")
-    
     try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS
-        resource_path = os.path.join(base_path, relative_path)
-    except AttributeError:
-        # Running in development mode
-        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        resource_path = os.path.join(base_path, relative_path)
-    
-    # Convert to proper path separators for current OS
-    resource_path = os.path.normpath(resource_path)
-    return resource_path
+        from core.utils.paths import resource_path
+        return resource_path(relative_path)
+    except ImportError:
+        # Fallback nếu không import được
+        relative_path = relative_path.replace("\\", "/")
+        try:
+            base_path = sys._MEIPASS
+            resource_path = os.path.join(base_path, relative_path)
+        except AttributeError:
+            base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            resource_path = os.path.join(base_path, relative_path)
+        return os.path.normpath(resource_path)
 
 
 class ActivationDialog(QDialog):
+    activation_finished = Signal(bool)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Software Activate - Conveyor Calculator AI")
@@ -66,12 +66,10 @@ class ActivationDialog(QDialog):
     
     def _setup_background(self):
         """Thiết lập hình nền từ file Whisk_zkxmgy.png"""
-        # Direct path to the image file
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        image_path = os.path.join(current_dir, "images", "Whisk_zkxmgy.png")
+        # Sử dụng resource_path để tìm hình ảnh
+        image_path = get_resource_path("ui/images/Whisk_zkxmgy.png")
         
         # Debug: Print paths being tried
-        print(f"Current dir: {current_dir}")
         print(f"Looking for image at: {image_path}")
         print(f"Image exists: {os.path.exists(image_path)}")
         
@@ -189,8 +187,7 @@ class ActivationDialog(QDialog):
         if verify_input(self.username.text().strip(), self.password.text().strip()):
             write_activation(self.account_id)
             QMessageBox.information(self, "Thành công", "Đã kích hoạt.")
-            self.accept()
+            self.activation_finished.emit(True)
         else:
             QMessageBox.warning(self, "Sai mật khẩu", "Password không khớp. Vui lòng kiểm tra lại thẻ kích hoạt.")
-
-
+            self.activation_finished.emit(False)

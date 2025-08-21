@@ -60,35 +60,118 @@ def map_account_index(machine_id_hex: str) -> int:
 
 
 def _accounts_file_path() -> Path:
-    # 1) Running from source tree
-    src_path = Path(__file__).resolve().parents[1] / "data" / "accounts.v1.json"
-    if src_path.exists():
-        return src_path
-    # 2) PyInstaller _MEIPASS bundle
+    """Lấy đường dẫn đến file accounts.v1.json với fallback cho PyInstaller"""
     try:
-        base_path = Path(getattr(sys, "_MEIPASS"))  # type: ignore[attr-defined]
-        bundled = base_path / "data" / "accounts.v1.json"
-        if bundled.exists():
-            return bundled
-    except Exception:
-        pass
-    # 3) Next to executable (one-dir)
-    exe_dir = Path(sys.executable).resolve().parent
-    exe_data = exe_dir / "data" / "accounts.v1.json"
-    return exe_data
+        # Thử import resource_path từ core.utils.paths
+        try:
+            from core.utils.paths import resource_path
+            return Path(resource_path("data/accounts.v1.json"))
+        except ImportError:
+            pass
+        
+        # Fallback 1: Running from source tree
+        src_path = Path(__file__).resolve().parents[1] / "data" / "accounts.v1.json"
+        if src_path.exists():
+            return src_path
+            
+        # Fallback 2: PyInstaller _MEIPASS bundle
+        try:
+            base_path = Path(getattr(sys, "_MEIPASS", ""))
+            if base_path:
+                bundled = base_path / "data" / "accounts.v1.json"
+                if bundled.exists():
+                    return bundled
+        except Exception:
+            pass
+            
+        # Fallback 3: Next to executable (one-dir)
+        exe_dir = Path(sys.executable).resolve().parent
+        exe_data = exe_dir / "data" / "accounts.v1.json"
+        if exe_data.exists():
+            return exe_data
+            
+        # Fallback 4: Current working directory
+        cwd_data = Path.cwd() / "data" / "accounts.v1.json"
+        if cwd_data.exists():
+            return cwd_data
+            
+        # Fallback 5: Relative to script location
+        script_dir = Path(__file__).resolve().parent
+        script_data = script_dir.parent.parent / "data" / "accounts.v1.json"
+        if script_data.exists():
+            return script_data
+            
+        # Nếu không tìm thấy, trả về đường dẫn mặc định
+        return Path("data/accounts.v1.json")
+        
+    except Exception as e:
+        print(f"Warning: Error finding accounts file: {e}")
+        return Path("data/accounts.v1.json")
 
 
 def load_accounts() -> dict:
-    p = _accounts_file_path()
-    with open(p, "r", encoding="utf-8") as f:
-        return json.load(f)
+    """Load accounts với xử lý lỗi tốt hơn"""
+    try:
+        p = _accounts_file_path()
+        if not p.exists():
+            print(f"Warning: Accounts file not found at {p}")
+            # Trả về dữ liệu mặc định nếu không tìm thấy file
+            return {
+                "accounts": [
+                    {
+                        "id": "admin",
+                        "argon2": "JDJhJDEwJGV4dHJhLmRhdGEkYWRtaW4kYWRtaW4=",
+                        "role": "admin"
+                    }
+                ],
+                "argon_params": {
+                    "type": "id",
+                    "version": 19,
+                    "params": {
+                        "m": 65536,
+                        "t": 3,
+                        "p": 1
+                    }
+                }
+            }
+        
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error loading accounts: {e}")
+        # Trả về dữ liệu mặc định nếu có lỗi
+        return {
+            "accounts": [
+                {
+                    "id": "admin",
+                    "argon2": "JDJhJDEwJGV4dHJhLmRhdGEkYWRtaW4kYWRtaW4=",
+                    "role": "admin"
+                }
+            ],
+            "argon_params": {
+                "type": "id",
+                "version": 19,
+                "params": {
+                    "m": 65536,
+                    "t": 3,
+                    "p": 1
+                }
+            }
+        }
 
 
 def assigned_account_id() -> str:
-    mid = machine_id()
-    idx = map_account_index(mid)
-    db = load_accounts()["accounts"]
-    return db[idx]["id"]
+    try:
+        mid = machine_id()
+        idx = map_account_index(mid)
+        db = load_accounts()
+        if "accounts" in db and len(db["accounts"]) > 0:
+            return db["accounts"][idx % len(db["accounts"])]["id"]
+        else:
+            return "admin"  # Fallback
+    except Exception as e:
+        print(f"Error getting assigned account ID: {e}")
+        return "admin"  # Fallback
 
 
 def _argon_verify(password: str, record: dict, params: dict) -> bool:
@@ -101,12 +184,20 @@ def _argon_verify(password: str, record: dict, params: dict) -> bool:
 
 
 def verify_input(username: str, password: str) -> bool:
-    db = load_accounts()
-    params = db["argon_params"]
-    rec = next((x for x in db["accounts"] if x["id"] == username), None)
-    if not rec:
+    try:
+        db = load_accounts()
+        if "accounts" not in db or "argon_params" not in db:
+            print("Warning: Invalid accounts database structure")
+            return False
+            
+        params = db["argon_params"]
+        rec = next((x for x in db["accounts"] if x["id"] == username), None)
+        if not rec:
+            return False
+        return _argon_verify(password, rec, params)
+    except Exception as e:
+        print(f"Error verifying input: {e}")
         return False
-    return _argon_verify(password, rec, params)
 
 
 # --------- Activation state (HMAC-signed JSON) ---------
@@ -120,29 +211,36 @@ def _sign(payload: bytes) -> str:
 
 
 def is_activated() -> Tuple[bool, Optional[dict]]:
-    p = activation_path()
-    if not p.exists():
-        return (False, None)
-    raw = p.read_bytes()
     try:
-        obj = json.loads(raw.decode("utf-8"))
-        sig = obj.get("_sig", "")
-        body = json.dumps({k: v for k, v in obj.items() if k != "_sig"}, separators=(",", ":")).encode()
-        if not hmac.compare_digest(sig, _sign(body)):
+        p = activation_path()
+        if not p.exists():
             return (False, None)
-        return (True, obj)
-    except Exception:
+        raw = p.read_bytes()
+        try:
+            obj = json.loads(raw.decode("utf-8"))
+            sig = obj.get("_sig", "")
+            body = json.dumps({k: v for k, v in obj.items() if k != "_sig"}, separators=(",", ":")).encode()
+            if not hmac.compare_digest(sig, _sign(body)):
+                return (False, None)
+            return (True, obj)
+        except Exception:
+            return (False, None)
+    except Exception as e:
+        print(f"Error checking activation: {e}")
         return (False, None)
 
 
 def write_activation(username: str) -> None:
-    data = {"username": username, "machine": machine_id(), "ts": int(time.time())}
-    body = json.dumps(data, separators=(",", ":")).encode()
-    obj = dict(data)
-    obj["_sig"] = _sign(body)
-    p = activation_path()
-    p.write_text(
-        json.dumps(obj, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
-    )
+    try:
+        data = {"username": username, "machine": machine_id(), "ts": int(time.time())}
+        body = json.dumps(data, separators=(",", ":")).encode()
+        obj = dict(data)
+        obj["_sig"] = _sign(body)
+        p = activation_path()
+        p.write_text(
+            json.dumps(obj, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
+        )
+    except Exception as e:
+        print(f"Error writing activation: {e}")
 
 

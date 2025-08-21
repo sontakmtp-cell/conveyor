@@ -2,17 +2,22 @@
 # Phần mềm Tính toán Băng tải Công Nghiệp - 3D Enhanced Version
 
 # Core dependencies (unchanged)
-PySide6>=6.6
-matplotlib>=3.8
-pandas>=2.2
-numpy>=1.26
-openpyxl>=3.1
-XlsxWriter>=3.2
-fpdf2>=2.7
-scipy
-argon2-cffi>=23.1.0
-platformdirs>=4.2.0
-cryptography>=42.0.0
+PySide6>=6.5.0
+pandas>=1.5.0
+numpy>=1.21.0
+scipy>=1.9.0
+matplotlib>=3.5.0
+plotly>=5.0.0
+openpyxl>=3.0.0
+python-dotenv>=0.19.0
+faiss-cpu>=1.7.0
+sentence-transformers>=2.2.0
+google-generativeai>=0.3.0
+reportlab>=3.6.0
+Pillow>=9.0.0
+cryptography>=41.0.0
+platformdirs>=3.0.0
+argon2-cffi>=21.3.0
 
 # RAG and AI dependencies
 google-generativeai>=0.3.0

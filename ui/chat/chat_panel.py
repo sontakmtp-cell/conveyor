@@ -7,9 +7,11 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                            QTextEdit, QPushButton, QListWidget,
                            QListWidgetItem, QLabel, QCheckBox,
                            QSizePolicy, QProgressBar)
-from PySide6.QtCore import Qt, QTimer, QEvent, QDateTime
+from PySide6.QtCore import Qt, QTimer, QEvent, QDateTime, QThread, Signal
 from PySide6.QtGui import QMovie
 import os
+import asyncio
+import traceback
 from core.ai.chat_service import ChatService
 from core.rag.index import load_index
 
@@ -28,12 +30,34 @@ class MessageWidget(QWidget):
         
         self.setLayout(layout)
 
+class ChatWorker(QThread):
+    """Worker thread to run async chat service without blocking UI."""
+    response_ready = Signal(dict)
+
+    def __init__(self, chat_service, question, history):
+        super().__init__()
+        self.chat_service = chat_service
+        self.question = question
+        self.history = history
+
+    def run(self):
+        try:
+            # Call the synchronous ask method directly
+            response = self.chat_service.ask(self.question, self.history)
+            self.response_ready.emit(response)
+        except Exception as e:
+            error_details = f"Error in ChatWorker: {str(e)}\nTraceback: {traceback.format_exc()}"
+            print(error_details)
+            error_response = {"answer": f"Lỗi từ worker: {str(e)}"}
+            self.response_ready.emit(error_response)
+
 class ChatPanel(QWidget):
     def __init__(self):
         super().__init__()
         
         # Initialize chat history
         self.history = []
+        self.worker_thread = None
         
         # Setup UI first
         self.setup_ui()
@@ -215,7 +239,7 @@ class ChatPanel(QWidget):
         layout.addWidget(self.progress_bar)
         
         # Style the messages widget
-        self.messages.setStyleSheet("""
+        self.messages.setStyleSheet(r"""
             QListWidget {
                 border: 1px solid #e5e7eb;
                 border-radius: 8px;
@@ -351,38 +375,33 @@ class ChatPanel(QWidget):
         return super().eventFilter(obj, event)
     
     def send_message(self):
-        """Send the current message."""
+        """Send the current message using the worker thread."""
         message = self.input_box.toPlainText().strip()
-        if not message:
+        if not message or (hasattr(self, 'worker_thread') and self.worker_thread and self.worker_thread.isRunning()):
             return
             
-        # Clear input field
         self.input_box.clear()
-        
-        # Add user message to chat
         self.add_message("user", message)
         
-        # Show loading indicator
         self.loading_label.show()
         self.progress_bar.show()
-        self.progress_bar.setRange(0, 0)  # Indeterminate progress
+        self.progress_bar.setRange(0, 0)
+        self.send_button.setEnabled(False)
+
+        # Create and start the worker thread
+        current_history = self.history[:-1]
+        self.worker_thread = ChatWorker(self.chat_service, message, current_history)
+        self.worker_thread.response_ready.connect(self.handle_response)
+        self.worker_thread.finished.connect(self.worker_thread.deleteLater)
+        self.worker_thread.start()
+
+    def handle_response(self, response):
+        """Handle the response from the worker thread."""
+        answer = response.get("answer", "Xin lỗi, tôi không thể trả lời câu hỏi này.")
+        self.add_message("assistant", answer)
         
-        # Process message in background
-        try:
-            # Get response from chat service (pass history without the current user message)
-            current_history = self.history[:-1]  # Exclude the current user message
-            response = self.chat_service.ask(message, history=current_history)
-            answer = response.get("answer", "Xin lỗi, tôi không thể trả lời câu hỏi này.")
-            
-            # Add assistant response
-            self.add_message("assistant", answer)
-            
-        except Exception as e:
-            error_msg = f"Xin lỗi, tôi gặp lỗi khi xử lý câu hỏi của bạn: {str(e)}"
-            self.add_message("assistant", error_msg)
-            print(f"Error in send_message: {e}")
-        
-        finally:
-            # Hide loading indicators
-            self.loading_label.hide()
-            self.progress_bar.hide()
+        # Hide loading indicators and re-enable button
+        self.loading_label.hide()
+        self.progress_bar.hide()
+        self.send_button.setEnabled(True)
+        self.worker_thread = None

@@ -6,11 +6,14 @@ from PySide6.QtCore import QUrl, QTimer, Qt
 from PySide6.QtWebEngineWidgets import QWebEngineView
 
 def _resource_path(relative_path: str) -> str:
-    base_path = getattr(sys, "_MEIPASS", None)
-    if base_path:
-        return os.path.join(base_path, relative_path)
-    here = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(here, relative_path)
+    # For source and one-folder build, the file is relative to this script
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    
+    # For one-file build, _MEIPASS is the root, and our UI files are in a 'ui' subdir
+    if hasattr(sys, '_MEIPASS'):
+        base_path = os.path.join(sys._MEIPASS, 'ui')
+
+    return os.path.join(base_path, relative_path)
 
 class AdBannerWidget(QWebEngineView):
     """

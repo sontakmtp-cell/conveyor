@@ -1,0 +1,6 @@
+# AI Configuration
+AI_PROVIDER=gemini
+AI_API_KEY=AIzaSyD5ZSuTCLc9bWse6dI8rLqmKkKIueztP38
+INDEX_DIR=data/index
+PDF_PATH=data/hidden/TINH TOAN BANG TAI.pdf
+TOP_K=6

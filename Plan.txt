@@ -1,0 +1,59 @@
+Dự án là 1 phần mềm chuyên dùng để hỗ trợ tính toán, thiết kế băng tải dựa trên cơ sở dữ liệu lí thuyết trong file pdf đính kèm.
+Bây giờ tôi muốn thêm 1 tính năng nữa là tự động tính toán lựa chọn nhông, xích, tỉ số truyền phù hợp (dựa vào tham số tốc độ băng và đường kính puly dẫn động/đầu (loại A) đã được đề xuất)
+Đây là kế hoạch chi tiết để bổ sung tính năng chọn nhông–xích và tỉ số truyền
+
+1. Chuẩn bị dữ liệu ISO cho xích
+
+Tạo file dữ liệu xích mới: Trong thư mục core, tạo module mới chain_specs.py. Module này chứa dữ liệu được trích xuất từ file excel Bangtraxich.xlsx. Các dữ liệu này có thể được lưu dưới dạng một danh sách từ điển để dễ tra cứu.
+
+Giữ giới hạn mặc định: Mặc định chọn vận tốc xích tối đa 15 m/s và số răng nhỏ nhất 17. Các giá trị này sẽ được sử dụng trong module tính toán.
+
+2. Mở rộng mô hình dữ liệu
+
+Cập nhật ConveyorParameters: Thêm thuộc tính motor_speed_rpm (float) để người dùng nhập tốc độ động cơ, và chain_standard (string) để chọn ISO/ANSI (hoặc để mở rộng về sau). Tập tin core/models.py hiện tại đã từng được mở rộng để chứa các trường truyền động kép, nên bổ sung thêm vài trường nữa là phù hợp.
+
+Cập nhật CalculationResult: Thêm các trường: chain_pitch_mm, sprocket_teeth_small, sprocket_teeth_large, gear_ratio, chain_speed_mps, chain_standard_used để chứa kết quả tính toán.
+
+3. Cập nhật phần tính toán
+
+Tạo module core/chain_design.py:
+
+Viết hàm select_chain_and_sprockets(params: ConveyorParameters, result: CalculationResult) nhận vào thông số băng tải (bao gồm tốc độ băng, đường kính puly A và tốc độ động cơ) và kết quả đang tính.
+
+Trong hàm, tính tốc độ quay của puly A từ tốc độ băng V_mps và đường kính puly đề xuất hiện có trong result.recommended_pulley_diameters_mm (dòng 547-552 của engine.py cho thấy cách tính đường kính).
+
+Tính tỉ số truyền cần thiết i_total = motor_speed_rpm / pulley_rpm.
+
+Duyệt qua bảng xích ISO trong chain_specs.py để chọn cỡ xích có vận tốc cho phép ≥ vận tốc xích tính toán (vận tốc xích = π × pitch × z₁ × rpm_small / 60; ban đầu chọn z₁=17).
+
+Với mỗi cỡ xích, tính số răng nhông nhỏ z₁ ≥ 17 sao cho vận tốc xích không vượt giới hạn; sau đó tính z₂ = i_total × z₁ và làm tròn lên số nguyên. Điều chỉnh lại tỉ số truyền thực tế = z₂ / z₁.
+
+Chọn phương án đầu tiên đáp ứng yêu cầu; ghi lại kết quả vào CalculationResult.
+
+Gọi hàm mới trong core/engine.py: Sau khi tính xong đường kính puly và điền result.recommended_pulley_diameters_mm, gọi select_chain_and_sprockets() để bổ sung kết quả nhông–xích vào result. Không nên làm thay đổi các chức năng có sẵn; chỉ chèn thêm bước mới.
+
+4. Bổ sung giao diện người dùng
+
+Cập nhật cửa sổ chính (ui/main_window_3d_enhanced.py và ui/ui_components_3d_enhanced.py):
+
+Thêm trường nhập “Tốc độ động cơ (rpm)” để người dùng nhập giá trị này.
+
+Thêm lựa chọn “Tiêu chuẩn xích” (có thể mở rộng).
+
+Thêm một tab hoặc khu vực kết quả hiển thị: bước xích chọn, số răng nhông nhỏ/lớn, tỉ số truyền thực tế, vận tốc xích.
+
+Cập nhật tooltip (ui/tooltips.py): Thêm mô tả cho các trường mới, giải thích ý nghĩa của tốc độ động cơ và tiêu chuẩn xích.
+
+Đảm bảo các giá trị mặc định: Nếu người dùng không nhập tốc độ động cơ, hiển thị cảnh báo hoặc ngăn tính toán.
+
+5. Cập nhật xuất báo cáo
+
+PDF và Excel: Trong reports/exporter_pdf.py và reports/exporter_excel.py, bổ sung các trường nhông–xích vừa tính vào phần kết quả. Đảm bảo bố cục báo cáo vẫn rõ ràng, không quá dài dòng.
+
+6. Kiểm thử và hoàn thiện
+
+Test tính toán: Viết unit test (nếu có framework test sẵn) để kiểm tra hàm select_chain_and_sprockets() với một vài trường hợp điển hình.
+
+Test giao diện: Chạy thử phần mềm, nhập tốc độ động cơ khác nhau để đảm bảo kết quả hợp lý. Kiểm tra xem các trường mới không phá vỡ layout hiện tại.
+
+Tài liệu: Cập nhật README hoặc file hướng dẫn sử dụng, mô tả cách nhập tốc độ động cơ và ý nghĩa kết quả nhông–xích.

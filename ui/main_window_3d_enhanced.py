@@ -30,19 +30,65 @@ class Enhanced3DConveyorWindow(QMainWindow):
         
         # Load environment variables from .env file
         root_dir = Path(__file__).parent.parent.absolute()
-        dotenv_path = root_dir / '.env'
-        if dotenv_path.exists():
-            load_dotenv(dotenv_path=dotenv_path)
         
-        # Set default INDEX_DIR if not provided
+        # Try multiple possible locations for .env file
+        possible_env_paths = [
+            root_dir / '.env',  # Same directory as exe
+            root_dir / '_internal' / '.env',  # _internal subdirectory
+            root_dir / '..' / '.env',  # Parent directory
+        ]
+        
+        env_loaded = False
+        for env_path in possible_env_paths:
+            if env_path.exists():
+                print(f"Loading .env from: {env_path}")
+                load_dotenv(dotenv_path=env_path)
+                env_loaded = True
+                break
+        
+        if not env_loaded:
+            print("Warning: No .env file found in any expected location")
+            print("Available paths checked:")
+            for env_path in possible_env_paths:
+                print(f"  - {env_path}: {'exists' if env_path.exists() else 'not found'}")
+        
+        # Set default INDEX_DIR if not provided - Try multiple possible locations
         if not os.getenv('INDEX_DIR'):
-            os.environ['INDEX_DIR'] = str(root_dir / 'data' / 'index')
-            print(f"Using default INDEX_DIR: {os.environ['INDEX_DIR']}")
+            possible_index_paths = [
+                root_dir / 'data' / 'index',  # Same directory as exe
+                root_dir / '_internal' / 'data' / 'index',  # _internal subdirectory
+                root_dir / '..' / 'data' / 'index',  # Parent directory
+            ]
+            
+            index_dir = None
+            for idx_path in possible_index_paths:
+                if idx_path.exists():
+                    index_dir = idx_path
+                    break
+            
+            if index_dir is None:
+                # Create default index directory
+                index_dir = root_dir / 'data' / 'index'
+                print(f"Creating default index directory: {index_dir}")
+                index_dir.mkdir(parents=True, exist_ok=True)
+            
+            os.environ['INDEX_DIR'] = str(index_dir)
+            print(f"Using INDEX_DIR: {os.environ['INDEX_DIR']}")
             
         self.setWindowTitle(f"Phần mềm Tính toán Băng tải Công nghiệp v{VERSION}")
         self.resize(1600, 1000)
         self.current_theme = "light"
         self.setStyleSheet(LIGHT)
+        
+        # Thiết lập icon cho cửa sổ
+        try:
+            from core.utils.paths import resource_path
+            icon_path = resource_path("icon.ico")
+            if os.path.exists(icon_path):
+                self.setWindowIcon(QIcon(icon_path))
+        except Exception as e:
+            print(f"Không thể tải icon: {e}")
+        
         self.params: ConveyorParameters | None = None
         self.current_result: CalculationResult | None = None
         self.db_path = ""

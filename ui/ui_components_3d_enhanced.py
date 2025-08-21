@@ -252,8 +252,8 @@ class InputsPanel(QWidget):
 
     def _img_path(self, filename: str) -> str:
         try:
-            here = os.path.dirname(os.path.abspath(__file__))
-            return os.path.join(here, "images", filename)
+            from core.utils.paths import resource_path
+            return resource_path(f"ui/images/{filename}")
         except Exception:
             return filename
 
