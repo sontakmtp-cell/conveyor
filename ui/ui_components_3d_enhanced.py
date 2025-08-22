@@ -434,6 +434,27 @@ class Enhanced3DResultsPanel(QWidget):
         f_idlers.addRow("Khoảng cách chuyển tiếp (tối thiểu):", self.lbl_transition_dist)
         l_struct.addWidget(g_pulleys)
         l_struct.addWidget(g_idlers)
+        
+        # Thêm khu vực hiển thị bộ truyền động hoàn chỉnh
+        g_transmission = QGroupBox("Bộ truyền động hoàn chỉnh")
+        f_transmission = QFormLayout(g_transmission)
+        self.lbl_gearbox_ratio = QLabel("---"); self.lbl_gearbox_ratio.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        self.lbl_chain_designation = QLabel("---"); self.lbl_chain_designation.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        self.lbl_drive_sprocket = QLabel("---"); self.lbl_drive_sprocket.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        self.lbl_driven_sprocket = QLabel("---"); self.lbl_driven_sprocket.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        self.lbl_actual_velocity = QLabel("---"); self.lbl_actual_velocity.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        self.lbl_velocity_error = QLabel("---"); self.lbl_velocity_error.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        self.lbl_total_ratio = QLabel("---"); self.lbl_total_ratio.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        
+        f_transmission.addRow("Tỉ số truyền hộp số:", self.lbl_gearbox_ratio)
+        f_transmission.addRow("Mã xích:", self.lbl_chain_designation)
+        f_transmission.addRow("Số răng nhông dẫn:", self.lbl_drive_sprocket)
+        f_transmission.addRow("Số răng nhông bị dẫn:", self.lbl_driven_sprocket)
+        f_transmission.addRow("Vận tốc thực tế (m/s):", self.lbl_actual_velocity)
+        f_transmission.addRow("Sai số vận tốc (%):", self.lbl_velocity_error)
+        f_transmission.addRow("Tổng tỉ số truyền:", self.lbl_total_ratio)
+        
+        l_struct.addWidget(g_transmission)
         l_struct.addStretch(1)
         self.tabs.addTab(w_struct, "🏗️ Cấu trúc (Puly & Con lăn)")
 
@@ -545,6 +566,26 @@ class Enhanced3DResultsPanel(QWidget):
         
         transition_dist = getattr(r, 'transition_distance_m', 0.0)
         self.lbl_transition_dist.setText(f"{transition_dist:.3f} m")
+        
+        # Cập nhật thông tin bộ truyền động hoàn chỉnh
+        if hasattr(r, 'transmission_solution') and r.transmission_solution:
+            t = r.transmission_solution
+            self.lbl_gearbox_ratio.setText(f"{t.gearbox_ratio}")
+            self.lbl_chain_designation.setText(t.chain_designation)
+            self.lbl_drive_sprocket.setText(f"{t.drive_sprocket_teeth}")
+            self.lbl_driven_sprocket.setText(f"{t.driven_sprocket_teeth}")
+            self.lbl_actual_velocity.setText(f"{t.actual_belt_velocity:.3f}")
+            self.lbl_velocity_error.setText(f"{t.error:.2f}")
+            self.lbl_total_ratio.setText(f"{t.total_transmission_ratio:.2f}")
+        else:
+            # Hiển thị thông báo nếu không có giải pháp
+            self.lbl_gearbox_ratio.setText("Chưa xác định")
+            self.lbl_chain_designation.setText("Chưa xác định")
+            self.lbl_drive_sprocket.setText("Chưa xác định")
+            self.lbl_driven_sprocket.setText("Chưa xác định")
+            self.lbl_actual_velocity.setText("Chưa xác định")
+            self.lbl_velocity_error.setText("Chưa xác định")
+            self.lbl_total_ratio.setText("Chưa xác định")
 
     # --- [BẮT ĐẦU NÂNG CẤP] ---
     def _update_analysis_tab(self, r):
@@ -557,9 +598,9 @@ class Enhanced3DResultsPanel(QWidget):
 
         # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
         # Hiển thị kết quả bộ truyền động hoàn chỉnh
-        if hasattr(r, 'transmission') and r.transmission:
+        if hasattr(r, 'transmission_solution') and r.transmission_solution:
             ana_report_html += "<h4 style='color: #3b82f6;'>BỘ TRUYỀN ĐỘNG HOÀN CHỈNH</h4>"
-            t = r.transmission
+            t = r.transmission_solution
             ana_report_html += f"<p><b>Hộp số giảm tốc:</b> Tỉ số truyền = {t.gearbox_ratio}</p>"
             ana_report_html += f"<p><b>Bộ truyền nhông-xích:</b> {t.drive_sprocket_teeth} răng → {t.driven_sprocket_teeth} răng</p>"
             ana_report_html += f"<p><b>Xích:</b> {t.chain_designation} (bước {t.chain_pitch_mm} mm)</p>"

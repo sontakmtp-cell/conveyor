@@ -167,7 +167,7 @@ class CalculationResult:
 
     # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
     # Kết quả tính toán bộ truyền động hoàn chỉnh
-    transmission: Optional['TransmissionSolution'] = None
+    transmission_solution: Optional['TransmissionSolution'] = None
     # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
 
 # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
@@ -196,5 +196,6 @@ class TransmissionSolution:
     error: float = 0.0  # Sai số so với vận tốc yêu cầu (%)
     chain_designation: str = ""  # Mã xích được chọn
     total_transmission_ratio: float = 0.0  # Tổng tỉ số truyền thực tế
+    chain_spec: Optional[ChainSpec] = None  # Thông tin chi tiết về xích được chọn
 # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
 

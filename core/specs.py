@@ -53,7 +53,15 @@ ACTIVE_BELT_SPECS = BELT_SPECS.copy()
 
 # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
 # Danh sách tỉ số truyền tiêu chuẩn của hộp số giảm tốc
-STANDARD_GEARBOX_RATIOS = [5, 10, 15, 20, 25, 30, 40, 50, 60, 80, 100]
+# Sắp xếp theo thứ tự giảm dần để ưu tiên chi phí (tỷ số cao thường ít cấp hơn, rẻ hơn)
+STANDARD_GEARBOX_RATIOS = [100, 80, 60, 50, 40, 30, 25, 20, 15, 12.5, 10, 8, 6, 5]
+
+# Hằng số an toàn cho xích (dùng trong kiểm tra độ bền)
+CHAIN_TENSILE_STRENGTH_SAFETY_FACTOR = 8
+
+# Tỉ số truyền nhông-xích ưu tiên (để giảm mài mòn)
+PREFERRED_CHAIN_RATIO = 1.9
+PREFERRED_CHAIN_RANGE = (1.6, 2.2)
 
 def load_chain_data() -> List['ChainSpec']:
     """
@@ -79,14 +87,47 @@ def load_chain_data() -> List['ChainSpec']:
                 
                 # Xử lý dữ liệu từ file CSV
                 try:
+                    # Tính toán độ bền kéo dựa trên bước xích (approximate values)
+                    pitch_mm = float(row['Pitch P (mm)'].replace(',', '.'))
+                    
+                    # Ước tính độ bền kéo dựa trên bước xích (kN)
+                    # Các giá trị này có thể cần điều chỉnh dựa trên dữ liệu thực tế
+                    if pitch_mm <= 6.35:  # 04B, 05B
+                        tensile_single = 8.0
+                        tensile_double = 16.0
+                        tensile_triple = 24.0
+                    elif pitch_mm <= 9.525:  # 06B, 08B
+                        tensile_single = 17.8
+                        tensile_double = 35.6
+                        tensile_triple = 53.4
+                    elif pitch_mm <= 12.7:  # 10B, 12B
+                        tensile_single = 22.2
+                        tensile_double = 44.4
+                        tensile_triple = 66.6
+                    elif pitch_mm <= 15.875:  # 16B
+                        tensile_single = 31.1
+                        tensile_double = 62.2
+                        tensile_triple = 93.3
+                    elif pitch_mm <= 19.05:  # 20B, 24B
+                        tensile_single = 55.6
+                        tensile_double = 111.2
+                        tensile_triple = 166.8
+                    else:  # 28B, 32B, 40B
+                        tensile_single = 88.9
+                        tensile_double = 177.8
+                        tensile_triple = 266.7
+                    
                     chain_spec = ChainSpec(
                         designation=row['ANSI Standard Chain Code'].strip(),
-                        pitch_mm=float(row['Pitch P (mm)'].replace(',', '.')),
+                        pitch_mm=pitch_mm,
                         inner_width_mm=float(row['Inner Width W (mm)'].replace(',', '.')),
                         roller_diameter_mm=float(row['Roller Diameter D (mm)'].replace(',', '.')),
                         pin_diameter_mm=float(row['Pin Diameter d (mm)'].replace(',', '.')),
                         plate_thickness_mm=float(row['Plate Thickness T (mm)'].replace(',', '.')),
-                        weight_kgpm=float(row['Weight\nkg/m'].replace(',', '.'))
+                        weight_kgpm=float(row['Weight\nkg/m'].replace(',', '.')),
+                        tensile_strength_single_kn=tensile_single,
+                        tensile_strength_double_kn=tensile_double,
+                        tensile_strength_triple_kn=tensile_triple
                     )
                     chain_specs.append(chain_spec)
                 except (ValueError, KeyError) as e:

@@ -418,6 +418,28 @@ class ProfessionalPDFExporter(FPDF):
             "Khoảng cách chuyển tiếp tối thiểu": f"{r.transition_distance_m:.3f} m",
         }
         self._draw_key_value_table(idler_data, "Khoảng cách Con lăn đề xuất (Mục 8.2)")
+        self.ln(5)
+        
+        # Thêm thông tin bộ truyền động hoàn chỉnh
+        if hasattr(r, 'transmission_solution') and r.transmission_solution:
+            transmission_data = {
+                "Tỉ số truyền hộp số": f"{r.transmission_solution.gearbox_ratio}",
+                "Mã xích": r.transmission_solution.chain_designation,
+                "Số răng nhông dẫn": f"{r.transmission_solution.drive_sprocket_teeth}",
+                "Số răng nhông bị dẫn": f"{r.transmission_solution.driven_sprocket_teeth}",
+                "Bước xích": f"{r.transmission_solution.chain_pitch_mm:.1f} mm",
+                "Vận tốc thực tế": f"{r.transmission_solution.actual_belt_velocity:.3f} m/s",
+                "Sai số vận tốc": f"{r.transmission_solution.error:.2f}%",
+                "Tổng tỉ số truyền": f"{r.transmission_solution.total_transmission_ratio:.2f}",
+            }
+            self._draw_key_value_table(transmission_data, "Thông số Bộ truyền động hoàn chỉnh")
+        else:
+            # Hiển thị thông báo nếu không có giải pháp
+            no_solution_data = {
+                "Trạng thái": "Không tìm thấy giải pháp phù hợp",
+                "Ghi chú": "Cần kiểm tra lại các tham số đầu vào hoặc mở rộng danh sách xích"
+            }
+            self._draw_key_value_table(no_solution_data, "Thông số Bộ truyền động hoàn chỉnh")
 
     def draw_chart_appendix(self, fig_obj):
         """Mục 7: Phụ lục Biểu đồ."""

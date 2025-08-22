@@ -254,6 +254,42 @@ def _write_structural_sheet(writer, result, formats):
         worksheet.write(row, 0, key, formats['label'])
         worksheet.write(row, 1, value, formats['number'])
         row += 1
+    
+    # Bảng Bộ truyền động hoàn chỉnh
+    row += 1
+    worksheet.merge_range(f'A{row}:B{row}', 'Thông số Bộ truyền động hoàn chỉnh', formats['group_header'])
+    row += 1
+    
+    if hasattr(result, 'transmission_solution') and result.transmission_solution:
+        transmission_data = {
+            "Tỉ số truyền hộp số": result.transmission_solution.gearbox_ratio,
+            "Mã xích": result.transmission_solution.chain_designation,
+            "Số răng nhông dẫn": result.transmission_solution.drive_sprocket_teeth,
+            "Số răng nhông bị dẫn": result.transmission_solution.driven_sprocket_teeth,
+            "Bước xích (mm)": result.transmission_solution.chain_pitch_mm,
+            "Vận tốc thực tế (m/s)": result.transmission_solution.actual_belt_velocity,
+            "Sai số vận tốc (%)": result.transmission_solution.error,
+            "Tổng tỉ số truyền": result.transmission_solution.total_transmission_ratio,
+        }
+        
+        for key, value in transmission_data.items():
+            worksheet.write(row, 0, key, formats['label'])
+            if isinstance(value, (int, float)):
+                if "Sai số" in key:
+                    worksheet.write(row, 1, f"{value:.2f}%", formats['percent'])
+                elif "Bước xích" in key:
+                    worksheet.write(row, 1, f"{value:.1f} mm", formats['value'])
+                elif "Vận tốc" in key:
+                    worksheet.write(row, 1, f"{value:.3f} m/s", formats['number'])
+                else:
+                    worksheet.write(row, 1, value, formats['number'])
+            else:
+                worksheet.write(row, 1, value, formats['value'])
+            row += 1
+    else:
+        worksheet.write(row, 0, "Không tìm thấy giải pháp phù hợp", formats['label'])
+        worksheet.write(row, 1, "N/A", formats['value'])
+        row += 1
 
     worksheet.set_column('A:A', 35)
     worksheet.set_column('B:B', 25)
