@@ -240,15 +240,20 @@ class CalculationStrategy(ABC):
         print(f"DEBUG: q_eff={q_eff}")
         print(f"DEBUG: BEFORE - material_load_kgpm={self.r.material_load_kgpm}")
         
-        # Chỉ cập nhật nếu q_eff nhỏ hơn q_from_Qt (bị khống chế bởi tiết diện)
+        # LUÔN cập nhật material_load_kgpm dựa trên khối lượng riêng vật liệu mới
+        # Đây là sửa đổi quan trọng để đảm bảo công suất động cơ thay đổi khi thay đổi vật liệu
         if q_eff < q_from_Qt - 1e-6:
+            # Bị khống chế bởi tiết diện
             self.r.material_load_kgpm = q_eff
             self.r.warnings.append(
                 f"Lưu lượng thực bị khống chế bởi tiết diện: Q_thực≈{q_eff * V * 3.6 / 1000.0:.1f} t/h < Q_yêu cầu={self.p.Qt_tph:.1f} t/h."
             )
             print(f"DEBUG: UPDATED material_load_kgpm to {q_eff} due to geometric limitation")
         else:
-            print(f"DEBUG: KEPT material_load_kgpm as {self.r.material_load_kgpm} (no geometric limitation)")
+            # Không bị khống chế bởi tiết diện, nhưng vẫn cập nhật dựa trên khối lượng riêng mới
+            # Tính lại material_load_kgpm từ lưu lượng yêu cầu và khối lượng riêng
+            self.r.material_load_kgpm = q_from_Qt
+            print(f"DEBUG: UPDATED material_load_kgpm to {q_from_Qt} based on new material density")
         
         # Luôn cập nhật total_load_kgpm và mass_flow_rate
         self.r.total_load_kgpm = self.r.material_load_kgpm + self.r.belt_weight_kgpm + self.r.moving_parts_weight_kgpm
@@ -390,8 +395,17 @@ class CalculationStrategy(ABC):
         self._compute_geometry_capacity()
         self._apply_geo_limitation_to_load()
         
+        # Cập nhật lại total_load_kgpm sau khi material_load_kgpm có thể đã thay đổi
+        self.r.total_load_kgpm = self.r.material_load_kgpm + self.r.belt_weight_kgpm + self.r.moving_parts_weight_kgpm
+        
+        # Cập nhật lại mass_flow_rate và Qt_effective_tph dựa trên material_load_kgpm mới
+        V = max(0.05, float(self.p.V_mps))
+        self.r.mass_flow_rate = self.r.material_load_kgpm * V
+        self.r.Qt_effective_tph = self.r.mass_flow_rate * 3.6 / 1000.0
+        
         # Debug: sau khi áp dụng giới hạn hình học
         print(f"DEBUG: AFTER GEO - material_load_kgpm={self.r.material_load_kgpm}, total_load_kgpm={self.r.total_load_kgpm}")
+        print(f"DEBUG: AFTER GEO - mass_flow_rate={self.r.mass_flow_rate}, Qt_effective_tph={self.r.Qt_effective_tph}")
         
         # --- [BẮT ĐẦU NÂNG CẤP] ---
         # Phân luồng tính toán cho truyền động đơn và kép
@@ -691,11 +705,17 @@ def calculate(p: ConveyorParameters) -> CalculationResult:
         transmission_solution = find_optimal_transmission(
             calculation_params=p,
             chain_specs=ACTIVE_CHAIN_SPECS,
-            pulley_diameter=pulley_diameter  # Truyền đường kính puly thực tế
+            pulley_diameter=pulley_diameter,  # Truyền đường kính puly thực tế
+            required_power_kw=result.required_power_kw if hasattr(result, "required_power_kw") else None
         )
         
         if transmission_solution:
             result.transmission_solution = transmission_solution
+            # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
+            # Gán thông tin về chế độ hộp số vào kết quả để UI hiển thị
+            result.gearbox_ratio_mode = p.gearbox_ratio_mode
+            result.gearbox_ratio_user = p.gearbox_ratio_user
+            # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
             print(f"DEBUG: Đã tìm thấy giải pháp truyền động: {transmission_solution}")
         else:
             print("DEBUG: Không tìm thấy giải pháp truyền động phù hợp")
@@ -708,12 +728,15 @@ def calculate(p: ConveyorParameters) -> CalculationResult:
     return result
 
 # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
-def find_optimal_transmission(calculation_params: 'ConveyorParameters', chain_specs: list, pulley_diameter: float) -> Optional['TransmissionSolution']:
+def find_optimal_transmission(calculation_params: 'ConveyorParameters',
+                              chain_specs: list,
+                              pulley_diameter: float,
+                              required_power_kw: float | None = None) -> Optional['TransmissionSolution']:
     """
-    Tìm giải pháp truyền động tối ưu đa mục tiêu theo kế hoạch Plan B Optimized:
-    1. Chọn hộp số trước để tốc độ trục ra không lớn hơn nhiều so với tốc độ puly yêu cầu
-    2. Sau đó chọn tỉ số nhông ~ 2.0 (ưu tiên 1.6–2.2) để giảm mài mòn
-    3. Tối ưu theo thứ tự: sai số vận tốc → tổng số răng nhỏ → i_s gần 1.9 → chi phí
+    Tìm giải pháp truyền động tối ưu đa mục tiêu theo kế hoạch Plan C:
+    1. Dùng dữ liệu thực từ Bang tra 1.csv (Tensile Strength, Measuring Load, ISO/ANSI, Strand)
+    2. Chọn nhông‑xích theo kiểm tra bền kéo (có hệ số an toàn), không chỉ theo tỉ số và răng
+    3. Tối ưu đa mục tiêu: sai số vận tốc → tổng răng nhỏ → i_s gần 1.9 → pitch nhỏ/nhẹ → margin bền kéo cao → hộp số dễ/tiết kiệm
     
     Args:
         calculation_params: Tham số tính toán băng tải
@@ -732,25 +755,45 @@ def find_optimal_transmission(calculation_params: 'ConveyorParameters', chain_sp
     # Tính tốc độ puly yêu cầu: n_pulley_req = (V * 60) / (π * D)
     rpm_pulley_required = (target_velocity * 60) / (math.pi * pulley_diameter / 1000)
     
-    print(f"DEBUG TRANSMISSION: target_velocity={target_velocity} m/s, pulley_diameter={pulley_diameter} mm")
-    print(f"DEBUG TRANSMISSION: motor_rpm={motor_rpm}, rpm_pulley_required={rpm_pulley_required:.2f}")
+    print(f"DEBUG TX: target_velocity={target_velocity} m/s, pulley_diameter={pulley_diameter} mm")
+    print(f"DEBUG TX: motor_rpm={motor_rpm}, rpm_pulley_required={rpm_pulley_required:.2f}")
     
     valid_solutions = []
     
-    # Vòng lặp chính - Duyệt qua các hộp số theo thứ tự giảm dần (ưu tiên chi phí)
-    for gearbox_ratio in STANDARD_GEARBOX_RATIOS:
+    # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
+    # Xác định danh sách tỉ số hộp số theo chế độ
+    use_manual = (calculation_params.gearbox_ratio_mode.lower() == "manual" and calculation_params.gearbox_ratio_user > 0)
+    if use_manual:
+        gearbox_candidates = [calculation_params.gearbox_ratio_user]
+        print(f"DEBUG TX: Sử dụng chế độ Manual với i_g = {calculation_params.gearbox_ratio_user}")
+    else:
+        gearbox_candidates = STANDARD_GEARBOX_RATIOS
+        print(f"DEBUG TX: Sử dụng chế độ Auto với {len(STANDARD_GEARBOX_RATIOS)} tỉ số chuẩn")
+    # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
+    
+    # Vòng lặp chính - Duyệt qua các hộp số theo chế độ được chọn
+    for gearbox_ratio in gearbox_candidates:
         # Tính tốc độ trục ra của hộp số
         output_rpm = motor_rpm / gearbox_ratio
         
         # Tính tỉ số truyền nhông-xích mục tiêu: i_s = n_out / n_pulley_req
         i_sprocket_target = output_rpm / rpm_pulley_required
         
+        # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
         # Giới hạn tỉ số truyền nhông-xích trong khoảng hợp lý [1.2, 3.0]
-        # Ưu tiên vùng [1.6, 2.2] để giảm mài mòn
+        # Với chế độ Manual, clamp i_s_target nếu ngoài dải
         if i_sprocket_target < 1.2 or i_sprocket_target > 3.0:
-            continue
+            if use_manual:
+                # Clamp i_s_target cho chế độ Manual
+                clamped_i_s = max(1.2, min(3.0, i_sprocket_target))
+                print(f"DEBUG TX: Manual mode - i_s_target {i_sprocket_target:.3f} ngoài dải [1.2, 3.0], clamp về {clamped_i_s:.3f}")
+                i_sprocket_target = clamped_i_s
+            else:
+                # Bỏ qua cho chế độ Auto
+                continue
+        # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
         
-        print(f"DEBUG TRANSMISSION: gearbox_ratio={gearbox_ratio}, output_rpm={output_rpm:.2f}, i_s_target={i_sprocket_target:.3f}")
+        print(f"DEBUG TX: ig={gearbox_ratio}, output_rpm={output_rpm:.2f}, i_s_target={i_sprocket_target:.3f}")
         
         # Vòng lặp phụ - Tìm cặp nhông phù hợp
         for z1 in range(17, 26):  # Số răng nhông dẫn từ 17-25
@@ -772,48 +815,110 @@ def find_optimal_transmission(calculation_params: 'ConveyorParameters', chain_sp
             # Tính sai số
             error = abs(actual_velocity - target_velocity) / target_velocity * 100
             
-            # Vòng lặp thứ ba - Kiểm tra độ bền với từng loại xích
+            # Vòng lặp thứ ba - Kiểm tra độ bền với từng loại xích (dựa vào Tensile Strength, KHÔNG dùng Measuring Load làm allowable)
             for chain_spec in chain_specs:
-                # Tạm thời bỏ qua kiểm tra độ bền để đảm bảo logic hoạt động
-                # TODO: Cập nhật kiểm tra độ bền khi có dữ liệu đầy đủ
-                
-                # Tạo giải pháp hợp lệ
-                solution = TransmissionSolution(
-                    gearbox_ratio=gearbox_ratio,
-                    drive_sprocket_teeth=z1,
-                    driven_sprocket_teeth=z2_actual,
-                    chain_pitch_mm=chain_spec.pitch_mm,
-                    actual_belt_velocity=actual_velocity,
-                    error=error,
-                    chain_designation=chain_spec.designation,
-                    total_transmission_ratio=i_total_actual,
-                    chain_spec=chain_spec
-                )
-                
-                valid_solutions.append(solution)
-                
-                # Chỉ tạo một giải pháp cho mỗi cặp nhông, không cần kiểm tra tất cả xích
-                break
+                try:
+                    # Tốc độ xích (m/s)
+                    circumference_m = (chain_spec.pitch_mm / 1000.0) * z1
+                    v_chain = max(circumference_m * (output_rpm / 60.0), 1e-9)
+
+                    # Công suất yêu cầu (W) -> lực kéo yêu cầu trên xích (kN)
+                    if required_power_kw is not None and required_power_kw > 0:
+                        P_req_W = required_power_kw * 1000.0
+                        F_required_kN = (P_req_W / v_chain) / 1000.0
+                    else:
+                        # Fallback mềm để không loại bỏ toàn bộ khi thiếu dữ liệu
+                        # Giả định tải yêu cầu nhỏ (có thể cấu hình/ghi log để người dùng bổ sung power)
+                        F_required_kN = 0.5
+
+                    # Allowable theo Tensile/SF (đúng bản chất)
+                    if getattr(chain_spec, "tensile_strength_min_kn", 0.0) > 0.0:
+                        allowable_kN = chain_spec.tensile_strength_min_kn / CHAIN_TENSILE_STRENGTH_SAFETY_FACTOR
+                    else:
+                        # nếu CSV thiếu, bỏ qua kiểm tra bền cho bản ghi này
+                        allowable_kN = float("inf")
+
+                    # Lọc theo bền
+                    if F_required_kN > allowable_kN:
+                        print(f"DEBUG TX: Xích {getattr(chain_spec, 'designation', 'Unknown')} không đủ bền: F_req={F_required_kN:.3f} kN > F_allow={allowable_kN:.3f} kN")
+                        continue
+                    
+                    print(f"DEBUG TX: Xích {getattr(chain_spec, 'designation', 'Unknown')} đủ bền: F_req={F_required_kN:.3f} kN <= F_allow={allowable_kN:.3f} kN")
+
+                    # Tạo giải pháp hợp lệ
+                    solution = TransmissionSolution(
+                        gearbox_ratio=gearbox_ratio,
+                        drive_sprocket_teeth=z1,
+                        driven_sprocket_teeth=z2_actual,
+                        chain_pitch_mm=chain_spec.pitch_mm,
+                        actual_belt_velocity=actual_velocity,
+                        error=error,
+                        chain_designation=getattr(chain_spec, "designation", ""),
+                        total_transmission_ratio=i_total_actual,
+                        chain_spec=chain_spec,
+                        # --- [BẮT ĐẦU NÂNG CẤP THEO KẾ HOẠCH] ---
+                        required_force_kN=F_required_kN,
+                        allowable_kN=allowable_kN,
+                        safety_margin=allowable_kN / max(F_required_kN, 1e-9),
+                        chain_weight_kgpm=getattr(chain_spec, "weight_kgpm", 0.0)
+                        # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
+                    )
+                    valid_solutions.append(solution)
+
+                    # ĐÃ tìm được xích đủ bền cho cặp z1/z2 hiện tại
+                    # KHÔNG break để xem xét tất cả các loại xích có thể phù hợp
+                    # (sẽ sắp xếp sau để chọn tốt nhất)
+                except (ValueError, AttributeError) as e:
+                    # Bỏ qua xích có dữ liệu không hợp lệ
+                    print(f"DEBUG TX: Bỏ qua xích {getattr(chain_spec, 'designation', 'Unknown')} do lỗi: {e}")
+                    continue
     
+    # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
     # Lựa chọn giải pháp tốt nhất
     if not valid_solutions:
-        print("DEBUG TRANSMISSION: Không tìm thấy giải pháp phù hợp")
+        if use_manual:
+            print(f"DEBUG TX: Chế độ Manual - Không tìm thấy giải pháp phù hợp với i_g = {calculation_params.gearbox_ratio_user}")
+            print("DEBUG TX: Khuyến nghị: Thử i_g khác hoặc chuyển về chế độ Auto")
+        else:
+            print("DEBUG TX: Chế độ Auto - Không tìm thấy giải pháp phù hợp")
         return None
+    # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
     
-    # Sắp xếp theo tiêu chí tối ưu đa mục tiêu theo kế hoạch Plan B:
-    # 1. Ưu tiên hộp số có tỷ số cao hơn (rẻ hơn) - gearbox_ratio cao hơn
-    # 2. Nếu hộp số bằng nhau, ưu tiên i_s gần 1.9 (|i_s - 1.9|)
-    # 3. Nếu vẫn bằng nhau, ưu tiên tổng số răng nhỏ (z1 + z2)
-    # 4. Cuối cùng, ưu tiên sai số thấp nhất (error)
-    valid_solutions.sort(key=lambda x: (
-        -x.gearbox_ratio,  # Tỷ số hộp số giảm dần (ưu tiên chi phí)
-        abs((x.driven_sprocket_teeth / x.drive_sprocket_teeth) - PREFERRED_CHAIN_RATIO),  # |i_s - 1.9| tăng dần
-        x.drive_sprocket_teeth + x.driven_sprocket_teeth,  # Tổng số răng tăng dần
-        x.error  # Sai số tăng dần
-    ))
+    # Loại bỏ các giải pháp trùng lặp cặp răng (giữ lại giải pháp tốt nhất cho mỗi cặp)
+    unique_solutions = {}
+    for sol in valid_solutions:
+        key = (sol.drive_sprocket_teeth, sol.driven_sprocket_teeth)
+        if key not in unique_solutions or sol.error < unique_solutions[key].error:
+            unique_solutions[key] = sol
     
+    valid_solutions = list(unique_solutions.values())
+    
+    # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
+    # Cải thiện thuật toán sắp xếp để cân bằng tốt hơn giữa các tiêu chí
+    # Với chế độ Manual, ưu tiên giải pháp sử dụng i_g user
+    if use_manual:
+        valid_solutions.sort(key=lambda x: (
+            x.error,  # 1) Sai số vận tốc (ưu tiên cao nhất)
+            abs((x.driven_sprocket_teeth / x.drive_sprocket_teeth) - PREFERRED_CHAIN_RATIO),  # 2) Gần 1.9 (ưu tiên cao)
+            (x.drive_sprocket_teeth + x.driven_sprocket_teeth) * 0.1,  # 3) Tổng số răng (giảm ảnh hưởng)
+            getattr(x.chain_spec, "pitch_mm", 999.0) * 0.01,  # 4) Pitch nhỏ (giảm ảnh hưởng)
+            -x.safety_margin * 0.1  # 5) Margin bền kéo cao (ưu tiên an toàn)
+        ))
+    else:
+        # Chế độ Auto - giữ nguyên logic cũ
+        valid_solutions.sort(key=lambda x: (
+            x.error,  # 1) Sai số vận tốc (ưu tiên cao nhất)
+            abs((x.driven_sprocket_teeth / x.drive_sprocket_teeth) - PREFERRED_CHAIN_RATIO),  # 2) Gần 1.9 (ưu tiên cao)
+            (x.drive_sprocket_teeth + x.driven_sprocket_teeth) * 0.1,  # 3) Tổng số răng (giảm ảnh hưởng)
+            getattr(x.chain_spec, "pitch_mm", 999.0) * 0.01,  # 4) Pitch nhỏ (giảm ảnh hưởng)
+            -x.gearbox_ratio * 0.001  # 5) Hộp số tỉ số lớn (giảm ảnh hưởng)
+        ))
+    # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
+    
+    # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
     # In ra tất cả giải pháp để debug
-    print(f"DEBUG TRANSMISSION: Tìm thấy {len(valid_solutions)} giải pháp:")
+    mode_text = "Manual" if use_manual else "Auto"
+    print(f"DEBUG TX: Chế độ {mode_text} - Tìm thấy {len(valid_solutions)} giải pháp:")
     for i, sol in enumerate(valid_solutions[:5]):  # Chỉ hiển thị 5 giải pháp đầu
         i_s = sol.driven_sprocket_teeth / sol.drive_sprocket_teeth
         print(f"  {i+1}. gearbox={sol.gearbox_ratio}, z1={sol.drive_sprocket_teeth}, z2={sol.driven_sprocket_teeth}, "
@@ -821,10 +926,11 @@ def find_optimal_transmission(calculation_params: 'ConveyorParameters', chain_sp
     
     best_solution = valid_solutions[0]
     
-    print(f"DEBUG TRANSMISSION: Giải pháp tốt nhất: gearbox={best_solution.gearbox_ratio}, "
+    print(f"DEBUG TX: Chế độ {mode_text} - Giải pháp tốt nhất: gearbox={best_solution.gearbox_ratio}, "
           f"z1={best_solution.drive_sprocket_teeth}, z2={best_solution.driven_sprocket_teeth}, "
           f"i_s={best_solution.driven_sprocket_teeth/best_solution.drive_sprocket_teeth:.3f}, "
           f"chain={best_solution.chain_designation}, error={best_solution.error:.2f}%")
+    # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
     
     return best_solution
 
@@ -878,6 +984,6 @@ def select_transmission(target_velocity: float, pulley_diameter: float, motor_rp
         motor_rpm=motor_rpm
     )
     
-    return find_optimal_transmission(temp_params, chain_specs, pulley_diameter)
+    return find_optimal_transmission(temp_params, chain_specs, pulley_diameter, None)
 # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
 

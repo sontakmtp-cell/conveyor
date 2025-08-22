@@ -56,17 +56,25 @@ ACTIVE_BELT_SPECS = BELT_SPECS.copy()
 # Sắp xếp theo thứ tự giảm dần để ưu tiên chi phí (tỷ số cao thường ít cấp hơn, rẻ hơn)
 STANDARD_GEARBOX_RATIOS = [100, 80, 60, 50, 40, 30, 25, 20, 15, 12.5, 10, 8, 6, 5]
 
-# Hằng số an toàn cho xích (dùng trong kiểm tra độ bền)
-CHAIN_TENSILE_STRENGTH_SAFETY_FACTOR = 8
+# --- [BẮT ĐẦU NÂNG CẤP THEO KẾ HOẠCH] ---
+# Hằng số an toàn & sở thích
+CHAIN_SAFETY_FACTOR = 8.0
+PREFERRED_CHAIN_RATIO = 1.9
+PREFERRED_CHAIN_RANGE = (1.6, 2.2)
+CHAIN_WEIGHT_IMPORTANCE = 0.1
+# --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
 
-# Tỉ số truyền nhông-xích ưu tiên (để giảm mài mòn)
+# Hằng số an toàn cho xích (dùng trong kiểm tra độ bền) - ĐIỀU CHỈNH XUỐNG MỨC HỢP LÝ
+CHAIN_TENSILE_STRENGTH_SAFETY_FACTOR = 4
+
+# Tỉ số truyền nhông-xích ưu tiên (để giảm mài mòn) - GIỮ LẠI ĐỂ TƯƠNG THÍCH
 PREFERRED_CHAIN_RATIO = 1.9
 PREFERRED_CHAIN_RANGE = (1.6, 2.2)
 
 def load_chain_data() -> List['ChainSpec']:
     """
-    Tải dữ liệu xích từ các file CSV trong thư mục data
-    Trả về danh sách các ChainSpec
+    Tải dữ liệu xích từ file Bang tra 1.csv
+    Trả về danh sách các ChainSpec với dữ liệu thực từ CSV
     """
     from .models import ChainSpec
     import csv
@@ -74,8 +82,8 @@ def load_chain_data() -> List['ChainSpec']:
     
     chain_specs = []
     
-    # Đường dẫn đến file CSV
-    csv_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'Bang tra 2.csv')
+    # Đường dẫn đến file CSV (sử dụng dữ liệu đã cập nhật có Measuring Load & Tensile Strength thực)
+    csv_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'Bang tra 1.csv')
     
     try:
         with open(csv_path, 'r', encoding='utf-8') as file:
@@ -85,55 +93,50 @@ def load_chain_data() -> List['ChainSpec']:
                 if not row.get('ANSI Standard Chain Code') or row['ANSI Standard Chain Code'].strip() == '':
                     continue
                 
-                # Xử lý dữ liệu từ file CSV
+                # Xử lý dữ liệu từ file CSV (dùng dữ liệu thực, không ước lượng)
                 try:
-                    # Tính toán độ bền kéo dựa trên bước xích (approximate values)
                     pitch_mm = float(row['Pitch P (mm)'].replace(',', '.'))
-                    
-                    # Ước tính độ bền kéo dựa trên bước xích (kN)
-                    # Các giá trị này có thể cần điều chỉnh dựa trên dữ liệu thực tế
-                    if pitch_mm <= 6.35:  # 04B, 05B
-                        tensile_single = 8.0
-                        tensile_double = 16.0
-                        tensile_triple = 24.0
-                    elif pitch_mm <= 9.525:  # 06B, 08B
-                        tensile_single = 17.8
-                        tensile_double = 35.6
-                        tensile_triple = 53.4
-                    elif pitch_mm <= 12.7:  # 10B, 12B
-                        tensile_single = 22.2
-                        tensile_double = 44.4
-                        tensile_triple = 66.6
-                    elif pitch_mm <= 15.875:  # 16B
-                        tensile_single = 31.1
-                        tensile_double = 62.2
-                        tensile_triple = 93.3
-                    elif pitch_mm <= 19.05:  # 20B, 24B
-                        tensile_single = 55.6
-                        tensile_double = 111.2
-                        tensile_triple = 166.8
-                    else:  # 28B, 32B, 40B
-                        tensile_single = 88.9
-                        tensile_double = 177.8
-                        tensile_triple = 266.7
-                    
+                    weight_kgpm = float(row['Weight\nkg/m'].replace(',', '.'))
+                    iso_code = (row.get('ISO Standard Chain Code') or '').strip()
+                    ansi_code = (row.get('ANSI Standard Chain Code') or '').strip()
+                    strand_txt = (row.get('Strand') or '1R').strip().upper()
+                    strand = int(strand_txt.replace('R', '') or 1)
+
+                    # --- [BẮT ĐẦU NÂNG CẤP THEO KẾ HOẠCH] ---
+                    # Tensile Strength (min kN) - dùng để tính allowable (lực kéo cho phép)
+                    tensile_strength_min_kn = float(row['Tensile Strength (min kN)'].replace(',', '.'))
+                    # Measuring Load (min N) - chỉ dùng tham khảo, KHÔNG dùng làm allowable
+                    measuring_load_min_n = float(row['Measuring Load (min N)'].replace(',', '.'))
+                    measuring_load_min_kn = measuring_load_min_n / 1000.0
+                    # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
+
                     chain_spec = ChainSpec(
-                        designation=row['ANSI Standard Chain Code'].strip(),
+                        designation=ansi_code or iso_code,
+                        iso_code=iso_code,
+                        ansi_code=ansi_code,
+                        strand=strand,
                         pitch_mm=pitch_mm,
                         inner_width_mm=float(row['Inner Width W (mm)'].replace(',', '.')),
                         roller_diameter_mm=float(row['Roller Diameter D (mm)'].replace(',', '.')),
                         pin_diameter_mm=float(row['Pin Diameter d (mm)'].replace(',', '.')),
                         plate_thickness_mm=float(row['Plate Thickness T (mm)'].replace(',', '.')),
-                        weight_kgpm=float(row['Weight\nkg/m'].replace(',', '.')),
-                        tensile_strength_single_kn=tensile_single,
-                        tensile_strength_double_kn=tensile_double,
-                        tensile_strength_triple_kn=tensile_triple
+                        weight_kgpm=weight_kgpm,
+                        # giữ trường bền cũ (nếu nơi khác dùng), nhưng ưu tiên trường mới bên dưới
+                        tensile_strength_single_kn=0.0,
+                        tensile_strength_double_kn=0.0,
+                        tensile_strength_triple_kn=0.0,
+                        # --- [BẮT ĐẦU NÂNG CẤP THEO KẾ HOẠCH] ---
+                        # Trường mới từ CSV - Tensile Strength dùng để tính allowable
+                        tensile_strength_min_kn=tensile_strength_min_kn,
+                        # Measuring Load chỉ dùng tham khảo, KHÔNG dùng làm allowable
+                        measuring_load_min_kn=measuring_load_min_kn
+                        # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
                     )
                     chain_specs.append(chain_spec)
-                except (ValueError, KeyError) as e:
+                except (ValueError, KeyError):
                     # Bỏ qua các hàng có dữ liệu không hợp lệ
                     continue
-                    
+
     except FileNotFoundError:
         print(f"Không tìm thấy file CSV: {csv_path}")
     except Exception as e:

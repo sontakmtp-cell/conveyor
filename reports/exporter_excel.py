@@ -183,10 +183,20 @@ def _write_results_sheet(writer, result, formats):
 
     # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
     # Thêm thông số bộ truyền động hoàn chỉnh
-    if hasattr(result, 'transmission') and result.transmission:
-        t = result.transmission
+    if hasattr(result, 'transmission_solution') and result.transmission_solution:
+        t = result.transmission_solution
+        
+        # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
+        # Thông tin về chế độ hộp số
+        if hasattr(result, 'gearbox_ratio_mode'):
+            mode_text = "Manual" if result.gearbox_ratio_mode.lower() == "manual" else "Auto"
+            gearbox_info = f"{mode_text} - {t.gearbox_ratio:.1f}"
+        else:
+            gearbox_info = f"Auto - {t.gearbox_ratio:.1f}"
+        # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
+        
         result_groups["Bộ truyền động hoàn chỉnh"] = {
-            "Hộp số giảm tốc (tỉ số truyền)": t.gearbox_ratio,
+            "Chế độ hộp số": gearbox_info,
             "Nhông dẫn (số răng)": t.drive_sprocket_teeth,
             "Nhông bị dẫn (số răng)": t.driven_sprocket_teeth,
             "Xích (mã)": t.chain_designation,
@@ -194,6 +204,12 @@ def _write_results_sheet(writer, result, formats):
             "Tổng tỉ số truyền": t.total_transmission_ratio,
             "Vận tốc thực tế (m/s)": t.actual_belt_velocity,
             "Sai số (%)": t.error,
+            # --- [BẮT ĐẦU NÂNG CẤP THEO KẾ HOẠCH] ---
+            "Lực kéo yêu cầu (kN)": t.required_force_kN,
+            "Lực kéo cho phép (kN)": t.allowable_kN,
+            "Hệ số an toàn": t.safety_margin,
+            "Trọng lượng xích (kg/m)": t.chain_weight_kgpm
+            # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
         }
     # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
 
@@ -261,8 +277,17 @@ def _write_structural_sheet(writer, result, formats):
     row += 1
     
     if hasattr(result, 'transmission_solution') and result.transmission_solution:
+        # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
+        # Thông tin về chế độ hộp số
+        if hasattr(result, 'gearbox_ratio_mode'):
+            mode_text = "Manual" if result.gearbox_ratio_mode.lower() == "manual" else "Auto"
+            gearbox_info = f"{mode_text} - {result.transmission_solution.gearbox_ratio:.1f}"
+        else:
+            gearbox_info = f"Auto - {result.transmission_solution.gearbox_ratio:.1f}"
+        # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
+        
         transmission_data = {
-            "Tỉ số truyền hộp số": result.transmission_solution.gearbox_ratio,
+            "Chế độ hộp số": gearbox_info,
             "Mã xích": result.transmission_solution.chain_designation,
             "Số răng nhông dẫn": result.transmission_solution.drive_sprocket_teeth,
             "Số răng nhông bị dẫn": result.transmission_solution.driven_sprocket_teeth,
@@ -270,6 +295,12 @@ def _write_structural_sheet(writer, result, formats):
             "Vận tốc thực tế (m/s)": result.transmission_solution.actual_belt_velocity,
             "Sai số vận tốc (%)": result.transmission_solution.error,
             "Tổng tỉ số truyền": result.transmission_solution.total_transmission_ratio,
+            # --- [BẮT ĐẦU NÂNG CẤP THEO KẾ HOẠCH] ---
+            "Lực kéo yêu cầu (kN)": result.transmission_solution.required_force_kN,
+            "Lực kéo cho phép (kN)": result.transmission_solution.allowable_kN,
+            "Hệ số an toàn": result.transmission_solution.safety_margin,
+            "Trọng lượng xích (kg/m)": result.transmission_solution.chain_weight_kgpm
+            # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
         }
         
         for key, value in transmission_data.items():

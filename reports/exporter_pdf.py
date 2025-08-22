@@ -304,13 +304,13 @@ class ProfessionalPDFExporter(FPDF):
         
         # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
         # Thông số bộ truyền động hoàn chỉnh
-        if hasattr(r, 'transmission') and r.transmission:
+        if hasattr(r, 'transmission_solution') and r.transmission_solution:
             self.set_font("DejaVu", "B", 11)
             self.set_text_color(*COLOR_PRIMARY)
             self.cell(0, 10, "BỘ TRUYỀN ĐỘNG HOÀN CHỈNH", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             self.ln(2)
             
-            t = r.transmission
+            t = r.transmission_solution
             transmission_data = {
                 "Hộp số giảm tốc (tỉ số truyền)": f"{t.gearbox_ratio}",
                 "Bộ truyền nhông-xích": f"{t.drive_sprocket_teeth} răng → {t.driven_sprocket_teeth} răng",
@@ -318,6 +318,12 @@ class ProfessionalPDFExporter(FPDF):
                 "Tổng tỉ số truyền": f"{t.total_transmission_ratio:.2f}",
                 "Vận tốc thực tế": f"{t.actual_belt_velocity:.3f} m/s",
                 "Sai số so với yêu cầu": f"{t.error:.2f}%",
+                # --- [BẮT ĐẦU NÂNG CẤP THEO KẾ HOẠCH] ---
+                "Lực kéo yêu cầu": f"{t.required_force_kN:.2f} kN",
+                "Lực kéo cho phép": f"{t.allowable_kN:.2f} kN",
+                "Hệ số an toàn": f"{t.safety_margin:.2f}",
+                "Trọng lượng xích": f"{t.chain_weight_kgpm:.3f} kg/m"
+                # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
             }
             
             self.set_font("DejaVu", "", 10)
@@ -422,8 +428,17 @@ class ProfessionalPDFExporter(FPDF):
         
         # Thêm thông tin bộ truyền động hoàn chỉnh
         if hasattr(r, 'transmission_solution') and r.transmission_solution:
+            # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
+            # Thông tin về chế độ hộp số
+            if hasattr(r, 'gearbox_ratio_mode'):
+                mode_text = "Manual" if r.gearbox_ratio_mode.lower() == "manual" else "Auto"
+                gearbox_info = f"{mode_text} - {r.transmission_solution.gearbox_ratio:.1f}"
+            else:
+                gearbox_info = f"Auto - {r.transmission_solution.gearbox_ratio:.1f}"
+            # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
+            
             transmission_data = {
-                "Tỉ số truyền hộp số": f"{r.transmission_solution.gearbox_ratio}",
+                "Chế độ hộp số": gearbox_info,
                 "Mã xích": r.transmission_solution.chain_designation,
                 "Số răng nhông dẫn": f"{r.transmission_solution.drive_sprocket_teeth}",
                 "Số răng nhông bị dẫn": f"{r.transmission_solution.driven_sprocket_teeth}",
@@ -431,6 +446,12 @@ class ProfessionalPDFExporter(FPDF):
                 "Vận tốc thực tế": f"{r.transmission_solution.actual_belt_velocity:.3f} m/s",
                 "Sai số vận tốc": f"{r.transmission_solution.error:.2f}%",
                 "Tổng tỉ số truyền": f"{r.transmission_solution.total_transmission_ratio:.2f}",
+                # --- [BẮT ĐẦU NÂNG CẤP THEO KẾ HOẠCH] ---
+                "Lực kéo yêu cầu": f"{r.transmission_solution.required_force_kN:.2f} kN",
+                "Lực kéo cho phép": f"{r.transmission_solution.allowable_kN:.2f} kN",
+                "Hệ số an toàn": f"{r.transmission_solution.safety_margin:.2f}",
+                "Trọng lượng xích": f"{r.transmission_solution.chain_weight_kgpm:.3f} kg/m",
+                # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
             }
             self._draw_key_value_table(transmission_data, "Thông số Bộ truyền động hoàn chỉnh")
         else:

@@ -91,6 +91,13 @@ class ConveyorParameters:
     motor_rpm: int = 1450
     # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
     
+    # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
+    # Chế độ chọn tỉ số hộp số: "auto" | "manual"
+    gearbox_ratio_mode: str = "auto"
+    # Tỉ số hộp số do người dùng nhập (>0 khi mode="manual")
+    gearbox_ratio_user: float = 0.0
+    # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
+    
     db_path: str = ""
 
 @dataclass
@@ -169,6 +176,12 @@ class CalculationResult:
     # Kết quả tính toán bộ truyền động hoàn chỉnh
     transmission_solution: Optional['TransmissionSolution'] = None
     # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
+    
+    # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
+    # Thông tin về chế độ hộp số được sử dụng
+    gearbox_ratio_mode: str = "auto"  # Chế độ đã sử dụng: "auto" | "manual"
+    gearbox_ratio_user: float = 0.0   # Tỉ số hộp số do người dùng nhập (nếu manual)
+    # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
 
 # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
 # Model cho thông số xích
@@ -181,9 +194,16 @@ class ChainSpec:
     pin_diameter_mm: float = 0.0  # Đường kính chốt (mm)
     plate_thickness_mm: float = 0.0  # Độ dày tấm (mm)
     weight_kgpm: float = 0.0  # Trọng lượng (kg/m)
+    # Các trường bền kéo cũ (nếu nơi khác còn dùng)
     tensile_strength_single_kn: float = 0.0  # Độ bền kéo đơn dây (kN)
     tensile_strength_double_kn: float = 0.0  # Độ bền kéo đôi dây (kN)
     tensile_strength_triple_kn: float = 0.0  # Độ bền kéo ba dây (kN)
+    # --- Trường mới đọc trực tiếp từ CSV Bang tra 1.csv ---
+    tensile_strength_min_kn: float = 0.0     # Tensile Strength (min kN) – dùng để tính allowable
+    measuring_load_min_kn: float = 0.0       # Measuring Load (min N) -> đổi sang kN và chỉ dùng tham khảo
+    iso_code: str = ""                        # ISO Standard Chain Code
+    ansi_code: str = ""                       # ANSI Standard Chain Code
+    strand: int = 1                           # 1R/2R/3R -> 1/2/3
 
 # Model cho giải pháp truyền động hoàn chỉnh
 @dataclass
@@ -197,5 +217,12 @@ class TransmissionSolution:
     chain_designation: str = ""  # Mã xích được chọn
     total_transmission_ratio: float = 0.0  # Tổng tỉ số truyền thực tế
     chain_spec: Optional[ChainSpec] = None  # Thông tin chi tiết về xích được chọn
+    
+    # --- [BẮT ĐẦU NÂNG CẤP THEO KẾ HOẠCH] ---
+    required_force_kN: float = 0.0  # Lực kéo yêu cầu trên xích (kN)
+    allowable_kN: float = 0.0       # Lực kéo cho phép của xích (kN)
+    safety_margin: float = 0.0      # Hệ số an toàn (allowable/required)
+    chain_weight_kgpm: float = 0.0  # Trọng lượng xích (kg/m)
+    # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
 # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
 

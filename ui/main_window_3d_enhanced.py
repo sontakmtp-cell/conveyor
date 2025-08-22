@@ -397,6 +397,11 @@ class Enhanced3DConveyorWindow(QMainWindow):
             # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
             motor_rpm=int(i.cbo_motor_rpm.currentText()),
             # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
+            
+            # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
+            gearbox_ratio_mode=i.cbo_gearbox_ratio_mode.currentText().lower(),
+            gearbox_ratio_user=i.spn_gearbox_ratio_user.value() if i.cbo_gearbox_ratio_mode.currentText().lower() == "manual" else 0.0,
+            # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
             db_path=self.db_path
         )
         return self.params
@@ -451,6 +456,9 @@ class Enhanced3DConveyorWindow(QMainWindow):
 
     def _on_finished(self, result: CalculationResult):
         self.current_result = result
+        # Đảm bảo self.params được cập nhật với dữ liệu mới nhất
+        if not hasattr(self, 'params') or self.params is None:
+            self.params = self._collect()
         self._set_buttons(True)
         self.results.progress.setVisible(False)
         self._update_ui(result)
@@ -560,6 +568,8 @@ class Enhanced3DConveyorWindow(QMainWindow):
                               f"• Ước tính chi phí đầu tư (CAPEX): ${r.cost_capital_total:,.2f}\n"
                               f"• Ước tính chi phí vận hành/năm (OPEX): ${r.op_cost_total_per_year:,.2f}\n")
             self.results.txt_report.setPlainText(summary_report)
+            
+            # Cập nhật thông tin truyền động
             self._redraw_all_visualizations()
         except Exception as e:
             QMessageBox.critical(self, "Lỗi cập nhật Giao diện", f"Đã xảy ra lỗi khi hiển thị kết quả:\n{e}")
@@ -619,10 +629,15 @@ class Enhanced3DConveyorWindow(QMainWindow):
         QMessageBox.information(self, "Kiểm định", "\n".join(msgs))
 
     def _redraw_all_visualizations(self):
-        if not self.params or not self.current_result:
+        if not hasattr(self, 'params') or not self.params or not self.current_result:
             return
         if hasattr(self.results, 'update_visualizations'):
-            self.results.update_visualizations(self.params, self.current_result, self.current_theme)
+            try:
+                self.results.update_visualizations(self.params, self.current_result, self.current_theme)
+            except Exception as e:
+                print(f"Error in update_visualizations: {e}")
+                import traceback
+                traceback.print_exc()
 
     def _toggle_chat_panel(self):
         """Toggle the chat panel visibility and sync menu item state."""

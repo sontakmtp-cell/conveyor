@@ -85,6 +85,31 @@ HTML = {
         "• Động cơ chính (Puly 1) chịu 2/3 tải, động cơ phụ (Puly 2) chịu 1/3. Dùng khi cần một động cơ chính mạnh hơn."
     ),
     # --- [KẾT THÚC NÂNG CẤP] ---
+    
+    # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
+    "gearbox_ratio_mode_select": (
+        "<b>Chế độ hộp số</b><br>"
+        "Chọn cách xác định tỉ số truyền của hộp số giảm tốc.<br><br>"
+        "<u>Auto:</u><br>"
+        "• Phần mềm tự động chọn từ danh sách tỉ số chuẩn (5, 8, 10, 12.5, 15, 20, 25, 30...)<br>"
+        "• Tối ưu đa mục tiêu: sai số vận tốc → tổng răng nhỏ → i_s gần 1.9 → pitch nhỏ/nhẹ<br><br>"
+        "<u>Manual:</u><br>"
+        "• Người dùng nhập tỉ số cụ thể (ví dụ: 12.5)<br>"
+        "• Thuật toán sẽ tính và chọn nhông-xích dựa trên i_g này<br>"
+        "• Nếu i_s_target ngoài dải [1.2, 3.0], sẽ clamp về giới hạn gần nhất"
+    ),
+    "gearbox_ratio_input": (
+        "<b>Tỉ số hộp số</b><br>"
+        "Nhập tỉ số truyền của hộp số giảm tốc khi chọn chế độ Manual.<br><br>"
+        "<u>Giá trị hợp lý:</u><br>"
+        "• Thường từ 5 đến 100<br>"
+        "• Tỉ số cao = giảm tốc nhiều = motor quay nhanh, puly quay chậm<br>"
+        "• Tỉ số thấp = giảm tốc ít = motor và puly quay gần nhau<br><br>"
+        "<u>Gợi ý nhanh:</u><br>"
+        "• 5, 8, 10, 12.5, 15, 20, 25, 30, 40, 50, 60, 80, 100"
+    ),
+    # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
+    
     "spn_eta_m": "<b>Hiệu suất động cơ</b><br>Gần 1 là tốt.",
     "spn_eta_g": "<b>Hiệu suất hộp số</b><br>Cao thì đỡ tốn điện.",
     "spn_mu": "<b>Độ bám băng–tang</b><br>Bám tốt thì ít trượt.",
@@ -98,6 +123,21 @@ HTML = {
     "chk_dusty_env": "<b>Môi trường bụi</b><br>Nên che chắn và tăng bảo trì.",
     "chk_corr_env": "<b>Môi trường ăn mòn</b><br>Cần vật liệu chống gỉ, chống mục.",
     "chk_ex": "<b>Khu vực dễ nổ</b><br>Dùng thiết bị đạt chuẩn chống nổ.",
+    
+    # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
+    "motor_rpm_input": (
+        "<b>Tốc độ động cơ (vòng/phút)</b><br>"
+        "Tốc độ quay của động cơ điện.<br><br>"
+        "<u>Giá trị phổ biến:</u><br>"
+        "• 1450 rpm: Động cơ 4 cực, phổ biến nhất, hiệu suất cao<br>"
+        "• 2900 rpm: Động cơ 2 cực, tốc độ cao, công suất cao<br>"
+        "• 750 rpm: Động cơ 8 cực, tốc độ thấp, mô-men xoắn cao<br>"
+        "• 1000, 1500, 1800, 2200, 3000 rpm: Các tốc độ khác<br><br>"
+        "<u>Lưu ý:</u><br>"
+        "• Tốc độ cao = giảm tốc nhiều = hộp số tỉ số lớn<br>"
+        "• Tốc độ thấp = giảm tốc ít = hộp số tỉ số nhỏ"
+    ),
+    # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
 }
 
 def _set_tt(obj: Any, name: str, text: str) -> None:
