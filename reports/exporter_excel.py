@@ -181,6 +181,22 @@ def _write_results_sheet(writer, result, formats):
         }
     }
 
+    # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
+    # Thêm thông số bộ truyền động hoàn chỉnh
+    if hasattr(result, 'transmission') and result.transmission:
+        t = result.transmission
+        result_groups["Bộ truyền động hoàn chỉnh"] = {
+            "Hộp số giảm tốc (tỉ số truyền)": t.gearbox_ratio,
+            "Nhông dẫn (số răng)": t.drive_sprocket_teeth,
+            "Nhông bị dẫn (số răng)": t.driven_sprocket_teeth,
+            "Xích (mã)": t.chain_designation,
+            "Bước xích (mm)": t.chain_pitch_mm,
+            "Tổng tỉ số truyền": t.total_transmission_ratio,
+            "Vận tốc thực tế (m/s)": t.actual_belt_velocity,
+            "Sai số (%)": t.error,
+        }
+    # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
+
     if result.drive_distribution_method:
         result_groups["Truyền động kép"] = {
             "Phương pháp phân phối": result.drive_distribution_method,

@@ -1,59 +1,136 @@
-Dự án là 1 phần mềm chuyên dùng để hỗ trợ tính toán, thiết kế băng tải dựa trên cơ sở dữ liệu lí thuyết trong file pdf đính kèm.
-Bây giờ tôi muốn thêm 1 tính năng nữa là tự động tính toán lựa chọn nhông, xích, tỉ số truyền phù hợp (dựa vào tham số tốc độ băng và đường kính puly dẫn động/đầu (loại A) đã được đề xuất)
-Đây là kế hoạch chi tiết để bổ sung tính năng chọn nhông–xích và tỉ số truyền
+﻿Mục tiêu: Nâng cấp phần mềm để tích hợp module tính toán và tự động lựa chọn bộ truyền động hoàn chỉnh, bao gồm Hộp số giảm tốc và bộ truyền Nhông-xích, dựa trên các thông số đầu vào (vận tốc băng tải, đường kính puly, và tốc độ động cơ).
 
-1. Chuẩn bị dữ liệu ISO cho xích
+Logic mới:
+1.  Tính toán tốc độ quay yêu cầu của puly từ vận tốc băng tải và đường kính puly.
+2.  Tính toán tổng tỉ số truyền yêu cầu từ tốc độ động cơ và tốc độ puly.
+3.  Phần mềm sẽ duyệt qua danh sách các tỉ số truyền hộp số tiêu chuẩn (ví dụ: 5, 10, 15, 20...).
+4.  Với mỗi tỉ số truyền hộp số, phần mềm sẽ tính toán tỉ số truyền nhông-xích cần thiết.
+5.  Sau đó, tìm kiếm một cặp nhông (nhông dẫn, nhông bị dẫn) phù hợp để đạt được tỉ số truyền đó.
+6.  Cuối cùng, đề xuất tổ hợp Hộp số + Nhông-xích cho kết quả gần đúng nhất với yêu cầu.
 
-Tạo file dữ liệu xích mới: Trong thư mục core, tạo module mới chain_specs.py. Module này chứa dữ liệu được trích xuất từ file excel Bangtraxich.xlsx. Các dữ liệu này có thể được lưu dưới dạng một danh sách từ điển để dễ tra cứu.
+---
+### Giai đoạn 1: Chuẩn bị và Quản lý Dữ liệu (Không thay đổi)
+Mục tiêu: Thiết lập cơ chế đọc dữ liệu xích từ file CSV để dễ dàng bảo trì và mở rộng.
 
-Giữ giới hạn mặc định: Mặc định chọn vận tốc xích tối đa 15 m/s và số răng nhỏ nhất 17. Các giá trị này sẽ được sử dụng trong module tính toán.
+1.  **Tạo Model Dữ liệu cho Xích:**
+    * **File:** `core/models.py`
+    * **Hành động:** Sử dụng Pydantic model `ChainSpec` đã có để định nghĩa cấu trúc dữ liệu cho một loại xích.
 
-2. Mở rộng mô hình dữ liệu
+2.  **Tạo Hàm Tải Dữ liệu Xích:**
+    * **File:** `core/specs.py`
+    * **Hành động:** Sử dụng hàm `load_chain_data()` đã có để đọc và xử lý dữ liệu từ các file CSV trong thư mục `data`.
 
-Cập nhật ConveyorParameters: Thêm thuộc tính motor_speed_rpm (float) để người dùng nhập tốc độ động cơ, và chain_standard (string) để chọn ISO/ANSI (hoặc để mở rộng về sau). Tập tin core/models.py hiện tại đã từng được mở rộng để chứa các trường truyền động kép, nên bổ sung thêm vài trường nữa là phù hợp.
+---
+### Giai đoạn 2: Bổ sung Dữ liệu Hộp số Giảm tốc
+Mục tiêu: Thêm dữ liệu về các tỉ số truyền tiêu chuẩn của hộp số giảm tốc.
 
-Cập nhật CalculationResult: Thêm các trường: chain_pitch_mm, sprocket_teeth_small, sprocket_teeth_large, gear_ratio, chain_speed_mps, chain_standard_used để chứa kết quả tính toán.
+1.  **Thêm Dữ liệu Hộp số:**
+    * **File:** `core/specs.py`
+    * **Hành động:**
+        * Tạo một danh sách (list) chứa các tỉ số truyền phổ biến của hộp số giảm tốc. Ví dụ: `STANDARD_GEARBOX_RATIOS = [5, 10, 15, 20, 25, 30, 40, 50, 60, 80, 100]`.
+        * Hàm này sẽ cung cấp một danh sách các tỉ số truyền để module tính toán có thể duyệt qua.
 
-3. Cập nhật phần tính toán
+---
+### Giai đoạn 3: Cập nhật Calculation Engine
+Mục tiêu: Viết lại logic cốt lõi để thực hiện việc lựa chọn tổ hợp hộp số và nhông-xích.
 
-Tạo module core/chain_design.py:
+1.  **Mở rộng `CalculationResult` Model:**
+    * **File:** `core/models.py`
+    * **Hành động:**
+        * Tạo một Pydantic model mới `TransmissionSolution` để chứa thông tin về một giải pháp truyền động hoàn chỉnh:
+          ```python
+          class TransmissionSolution(BaseModel):
+              gearbox_ratio: float = Field(..., description="Tỉ số truyền của hộp số")
+              drive_sprocket_teeth: int = Field(..., description="Số răng nhông dẫn")
+              driven_sprocket_teeth: int = Field(..., description="Số răng nhông bị dẫn")
+              chain_pitch_mm: float = Field(..., description="Bước xích (mm)")
+              actual_belt_velocity: float = Field(..., description="Vận tốc băng tải thực tế (m/s)")
+              error: float = Field(..., description="Sai số so với vận tốc yêu cầu (%)")
+          ```
+        * Trong model `CalculationResult`, thay thế `chain_drive: Optional[ChainDriveResult]` bằng `transmission: Optional[TransmissionSolution]`.
 
-Viết hàm select_chain_and_sprockets(params: ConveyorParameters, result: CalculationResult) nhận vào thông số băng tải (bao gồm tốc độ băng, đường kính puly A và tốc độ động cơ) và kết quả đang tính.
+2.  **Xây dựng Logic Tính toán Chính:**
+    * **File:** `core/engine.py`
+    * **Hành động:**
+        * Tạo một hàm mới, ví dụ: `select_transmission(target_velocity: float, pulley_diameter: float, motor_rpm: int, chain_specs: list[ChainSpec]) -> Optional[TransmissionSolution]:`
+        * **Các bước trong hàm:**
+            a.  **Tính toán yêu cầu:**
+                * Tính tốc độ quay yêu cầu của puly (vòng/phút): `rpm_pulley = (target_velocity * 60) / (math.pi * pulley_diameter / 1000)`.
+                * Tính tổng tỉ số truyền yêu cầu: `i_total_required = motor_rpm / rpm_pulley`.
+            b.  **Khởi tạo biến:**
+                * Tạo một danh sách `possible_solutions = []` để lưu các giải pháp hợp lệ.
+            c.  **Vòng lặp chính - Duyệt qua các hộp số:**
+                * `for gearbox_ratio in STANDARD_GEARBOX_RATIOS:`
+                * Tính tỉ số truyền nhông-xích mục tiêu: `i_sprocket_target = i_total_required / gearbox_ratio`.
+                * Giới hạn `i_sprocket_target` trong khoảng hợp lý (ví dụ: từ 1 đến 7) để tránh các bộ truyền quá lớn hoặc không hiệu quả.
+            d.  **Vòng lặp phụ - Tìm cặp nhông phù hợp:**
+                * Duyệt qua số răng nhông dẫn `z1` trong một khoảng hợp lý (ví dụ: từ 17 đến 25 răng).
+                * Tính số răng nhông bị dẫn lý thuyết: `z2_ideal = z1 * i_sprocket_target`.
+                * Làm tròn `z2_ideal` đến số nguyên gần nhất để có `z2_actual`. Đảm bảo `z2_actual` không quá lớn (ví dụ: < 120 răng).
+                * Tính lại tỉ số truyền thực tế: `i_sprocket_actual = z2_actual / z1`.
+                * Tính tổng tỉ số truyền thực tế: `i_total_actual = gearbox_ratio * i_sprocket_actual`.
+                * Tính vận tốc băng tải thực tế: `actual_velocity = (motor_rpm / i_total_actual) * (math.pi * pulley_diameter / 1000) / 60`.
+                * Tính sai số: `error = abs(actual_velocity - target_velocity) / target_velocity`.
+                * Lưu giải pháp `(gearbox_ratio, z1, z2_actual, actual_velocity, error)` vào danh sách `possible_solutions`.
+            e.  **Lựa chọn giải pháp tốt nhất:**
+                * Sau khi duyệt qua tất cả các khả năng, sắp xếp `possible_solutions` theo `error` tăng dần.
+                * Trả về giải pháp có `error` nhỏ nhất. Nếu không tìm thấy giải pháp nào, trả về `None`.
 
-Trong hàm, tính tốc độ quay của puly A từ tốc độ băng V_mps và đường kính puly đề xuất hiện có trong result.recommended_pulley_diameters_mm (dòng 547-552 của engine.py cho thấy cách tính đường kính).
+3.  **Tích hợp vào `calculate()`:**
+    * **File:** `core/engine.py`
+    * **Hành động:**
+        * Trong hàm `calculate()`, gọi hàm `select_transmission()` mới.
+        * Lưu kết quả trả về vào `result.transmission`.
 
-Tính tỉ số truyền cần thiết i_total = motor_speed_rpm / pulley_rpm.
+---
+### Giai đoạn 4: Cập nhật Giao diện Người dùng (UI)
+Mục tiêu: Thêm trường nhập "Tốc độ động cơ" và hiển thị kết quả bộ truyền động được đề xuất.
 
-Duyệt qua bảng xích ISO trong chain_specs.py để chọn cỡ xích có vận tốc cho phép ≥ vận tốc xích tính toán (vận tốc xích = π × pitch × z₁ × rpm_small / 60; ban đầu chọn z₁=17).
+1.  **Thêm trường nhập liệu:**
+    * **File:** `ui/ui_components_3d_enhanced.py`
+    * **Hành động:**
+        * Trong `InputPanel`, thêm một `QComboBox` hoặc `QLineEdit` cho phép người dùng nhập hoặc chọn tốc độ động cơ (ví dụ: các giá trị phổ biến như 1450, 2900 vòng/phút).
+        * Gán một objectName (`motor_rpm_input`) để `main_window` có thể truy xuất giá trị.
 
-Với mỗi cỡ xích, tính số răng nhông nhỏ z₁ ≥ 17 sao cho vận tốc xích không vượt giới hạn; sau đó tính z₂ = i_total × z₁ và làm tròn lên số nguyên. Điều chỉnh lại tỉ số truyền thực tế = z₂ / z₁.
+2.  **Cập nhật `main_window` để xử lý đầu vào:**
+    * **File:** `ui/main_window_3d_enhanced.py`
+    * **Hành động:**
+        * Trong hàm `perform_calculation()`, đọc giá trị từ `motor_rpm_input`.
+        * Truyền giá trị này vào hàm `engine.calculate()`.
 
-Chọn phương án đầu tiên đáp ứng yêu cầu; ghi lại kết quả vào CalculationResult.
+3.  **Hiển thị kết quả:**
+    * **File:** `ui/ui_components_3d_enhanced.py`
+    * **Hành động:**
+        * Trong `OutputPanel`, thêm các `QLabel` mới để hiển thị các thông số của bộ truyền động được chọn:
+            * "Tỉ số truyền hộp số:"
+            * "Số răng nhông dẫn:"
+            * "Số răng nhông bị dẫn:"
+            * "Vận tốc băng tải thực tế:"
+    * **File:** `ui/main_window_3d_enhanced.py`
+    * **Hành động:**
+        * Trong hàm `display_results()`, kiểm tra `result.transmission`.
+        * Nếu có kết quả, cập nhật các `QLabel` tương ứng. Nếu không (kết quả là None), hiển thị thông báo "Không tìm thấy bộ truyền phù hợp".
 
-Gọi hàm mới trong core/engine.py: Sau khi tính xong đường kính puly và điền result.recommended_pulley_diameters_mm, gọi select_chain_and_sprockets() để bổ sung kết quả nhông–xích vào result. Không nên làm thay đổi các chức năng có sẵn; chỉ chèn thêm bước mới.
+---
+### Giai đoạn 5: Cập nhật Chức năng Xuất Báo cáo (Không thay đổi logic)
+Mục tiêu: Đưa các thông số của bộ truyền động đã chọn vào báo cáo PDF và Excel.
 
-4. Bổ sung giao diện người dùng
+1.  **Cập nhật Exporter PDF:**
+    * **File:** `reports/exporter_pdf.py`
+    * **Hành động:**
+        * Trong hàm tạo báo cáo, kiểm tra sự tồn tại của `result.transmission`.
+        * Nếu có, thêm một bảng mới với tiêu đề "Thông số bộ truyền động" và điền các giá trị tương ứng.
 
-Cập nhật cửa sổ chính (ui/main_window_3d_enhanced.py và ui/ui_components_3d_enhanced.py):
+2.  **Cập nhật Exporter Excel:**
+    * **File:** `reports/exporter_excel.py`
+    * **Hành động:**
+        * Tương tự như PDF, thêm các hàng mới vào file Excel để ghi lại các thông số của bộ truyền động đã được chọn.
 
-Thêm trường nhập “Tốc độ động cơ (rpm)” để người dùng nhập giá trị này.
+---
+### Giai đoạn 6: Kiểm thử và Hoàn thiện
+Mục tiêu: Đảm bảo tính năng mới hoạt động chính xác và ổn định.
 
-Thêm lựa chọn “Tiêu chuẩn xích” (có thể mở rộng).
-
-Thêm một tab hoặc khu vực kết quả hiển thị: bước xích chọn, số răng nhông nhỏ/lớn, tỉ số truyền thực tế, vận tốc xích.
-
-Cập nhật tooltip (ui/tooltips.py): Thêm mô tả cho các trường mới, giải thích ý nghĩa của tốc độ động cơ và tiêu chuẩn xích.
-
-Đảm bảo các giá trị mặc định: Nếu người dùng không nhập tốc độ động cơ, hiển thị cảnh báo hoặc ngăn tính toán.
-
-5. Cập nhật xuất báo cáo
-
-PDF và Excel: Trong reports/exporter_pdf.py và reports/exporter_excel.py, bổ sung các trường nhông–xích vừa tính vào phần kết quả. Đảm bảo bố cục báo cáo vẫn rõ ràng, không quá dài dòng.
-
-6. Kiểm thử và hoàn thiện
-
-Test tính toán: Viết unit test (nếu có framework test sẵn) để kiểm tra hàm select_chain_and_sprockets() với một vài trường hợp điển hình.
-
-Test giao diện: Chạy thử phần mềm, nhập tốc độ động cơ khác nhau để đảm bảo kết quả hợp lý. Kiểm tra xem các trường mới không phá vỡ layout hiện tại.
-
-Tài liệu: Cập nhật README hoặc file hướng dẫn sử dụng, mô tả cách nhập tốc độ động cơ và ý nghĩa kết quả nhông–xích.
+1.  **Test logic tính toán:**
+    * Kiểm tra hàm `select_transmission()` với các bộ đầu vào khác nhau (vận tốc, đường kính, tốc độ động cơ) để đảm bảo kết quả trả về là hợp lý và có sai số thấp.
+2.  **Test giao diện:**
+    * Chạy thử phần mềm, nhập các giá trị khác nhau để đảm bảo giao diện không bị lỗi, kết quả hiển thị đúng và báo cáo xuất ra đầy đủ thông tin.

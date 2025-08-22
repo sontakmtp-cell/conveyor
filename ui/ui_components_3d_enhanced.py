@@ -196,6 +196,15 @@ class InputsPanel(QWidget):
         self.cbo_dual_drive_ratio = QComboBox()
         self.cbo_dual_drive_ratio.addItems(["Phân phối lý thuyết", "Phân phối đều (50/50)", "Phân phối 2/1 (66/33)"])
         # --- [KẾT THÚC NÂNG CẤP] ---
+        
+        # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
+        # Tốc độ động cơ
+        self.cbo_motor_rpm = QComboBox()
+        self.cbo_motor_rpm.addItems(["1450", "2900", "750", "1000", "1500", "1800", "2200", "3000"])
+        self.cbo_motor_rpm.setCurrentText("1450")
+        self.cbo_motor_rpm.setObjectName("motor_rpm_input")
+        # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
+        
         self.spn_eta_m = QDoubleSpinBox(); self.spn_eta_m.setRange(0.8, 0.98); self.spn_eta_m.setDecimals(3); self.spn_eta_m.setValue(0.95)
         self.spn_eta_g = QDoubleSpinBox(); self.spn_eta_g.setRange(0.85, 0.98); self.spn_eta_g.setDecimals(3); self.spn_eta_g.setValue(0.96)
         self.spn_mu = QDoubleSpinBox(); self.spn_mu.setRange(0.2, 0.8); self.spn_mu.setDecimals(3); self.spn_mu.setValue(0.35)
@@ -309,6 +318,11 @@ class InputsPanel(QWidget):
         self.dual_drive_ratio_widget.setVisible(False) # Ẩn mặc định
         f.addRow(self.dual_drive_ratio_widget)
         # --- [KẾT THÚC NÂNG CẤP] ---
+        
+        # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
+        f.addRow("Tốc độ động cơ:", self.cbo_motor_rpm)
+        # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
+        
         f.addRow("Hiệu suất động cơ:", self.spn_eta_m)
         f.addRow("Hiệu suất hộp số:", self.spn_eta_g)
         f.addRow("HS ma sát băng-tang:", self.spn_mu)
@@ -540,6 +554,21 @@ class Enhanced3DResultsPanel(QWidget):
         ana_report_html += f"<p><b>- Hiệu suất truyền động:</b> {eff:.1f}% (η_m × η_g ÷ Kt)</p>"
         ana_report_html += f"<p><b>- Phần trăm sử dụng cường độ đai:</b> {r.belt_strength_utilization:.1f}%</p>"
         ana_report_html += f"<p><b>- Phần trăm sử dụng tiết diện (ước tính):</b> {r.capacity_utilization:.1f}%</p>"
+
+        # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
+        # Hiển thị kết quả bộ truyền động hoàn chỉnh
+        if hasattr(r, 'transmission') and r.transmission:
+            ana_report_html += "<h4 style='color: #3b82f6;'>BỘ TRUYỀN ĐỘNG HOÀN CHỈNH</h4>"
+            t = r.transmission
+            ana_report_html += f"<p><b>Hộp số giảm tốc:</b> Tỉ số truyền = {t.gearbox_ratio}</p>"
+            ana_report_html += f"<p><b>Bộ truyền nhông-xích:</b> {t.drive_sprocket_teeth} răng → {t.driven_sprocket_teeth} răng</p>"
+            ana_report_html += f"<p><b>Xích:</b> {t.chain_designation} (bước {t.chain_pitch_mm} mm)</p>"
+            ana_report_html += f"<p><b>Tổng tỉ số truyền:</b> {t.total_transmission_ratio:.2f}</p>"
+            ana_report_html += f"<p><b>Vận tốc thực tế:</b> {t.actual_belt_velocity:.3f} m/s</p>"
+            ana_report_html += f"<p><b>Sai số:</b> {t.error:.2f}%</p>"
+        else:
+            ana_report_html += "<p style='color: #64748b;'><i>Không tìm thấy bộ truyền động phù hợp</i></p>"
+        # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
 
         # Logic mới để hiển thị kết quả truyền động kép
         if r.drive_distribution_method:

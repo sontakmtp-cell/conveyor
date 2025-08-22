@@ -3,7 +3,7 @@
 # -*- coding: utf-8 -*-
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 class MaterialType(Enum):
     COAL = "Than đá"
@@ -85,6 +85,12 @@ class ConveyorParameters:
     # Thêm trường để nhận tùy chọn phân phối lực từ UI cho truyền động kép
     dual_drive_ratio: str = "Phân phối lý thuyết"
     # --- [KẾT THÚC NÂNG CẤP] ---
+    
+    # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
+    # Tốc độ động cơ (vòng/phút)
+    motor_rpm: int = 1450
+    # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
+    
     db_path: str = ""
 
 @dataclass
@@ -158,4 +164,37 @@ class CalculationResult:
     Fc_drive: float = 0.0                # Lực thắng ma sát nhánh căng (công thức 19) [kg]
     Fr_drive: float = 0.0                # Lực thắng ma sát nhánh chùng (công thức 20) [kg]
     # --- [KẾT THÚC NÂNG CẤP] ---
+
+    # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
+    # Kết quả tính toán bộ truyền động hoàn chỉnh
+    transmission: Optional['TransmissionSolution'] = None
+    # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
+
+# --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
+# Model cho thông số xích
+@dataclass
+class ChainSpec:
+    designation: str = ""  # Mã xích (ví dụ: 05B, 08A, 16B)
+    pitch_mm: float = 0.0  # Bước xích (mm)
+    inner_width_mm: float = 0.0  # Chiều rộng trong (mm)
+    roller_diameter_mm: float = 0.0  # Đường kính con lăn (mm)
+    pin_diameter_mm: float = 0.0  # Đường kính chốt (mm)
+    plate_thickness_mm: float = 0.0  # Độ dày tấm (mm)
+    weight_kgpm: float = 0.0  # Trọng lượng (kg/m)
+    tensile_strength_single_kn: float = 0.0  # Độ bền kéo đơn dây (kN)
+    tensile_strength_double_kn: float = 0.0  # Độ bền kéo đôi dây (kN)
+    tensile_strength_triple_kn: float = 0.0  # Độ bền kéo ba dây (kN)
+
+# Model cho giải pháp truyền động hoàn chỉnh
+@dataclass
+class TransmissionSolution:
+    gearbox_ratio: float = 0.0  # Tỉ số truyền của hộp số
+    drive_sprocket_teeth: int = 0  # Số răng nhông dẫn
+    driven_sprocket_teeth: int = 0  # Số răng nhông bị dẫn
+    chain_pitch_mm: float = 0.0  # Bước xích (mm)
+    actual_belt_velocity: float = 0.0  # Vận tốc băng tải thực tế (m/s)
+    error: float = 0.0  # Sai số so với vận tốc yêu cầu (%)
+    chain_designation: str = ""  # Mã xích được chọn
+    total_transmission_ratio: float = 0.0  # Tổng tỉ số truyền thực tế
+# --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
 

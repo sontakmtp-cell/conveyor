@@ -3,7 +3,7 @@
 
 import math
 from abc import ABC, abstractmethod
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Optional
 
 from .models import BeltType, CalculationResult, ConveyorParameters
 from .specs import G, ACTIVE_MATERIAL_DB, ACTIVE_BELT_SPECS
@@ -677,5 +677,135 @@ def calculate(p: ConveyorParameters) -> CalculationResult:
     common_data = {"material": mat}
     belt_specs = belt or {}
     strat = get_strategy(p, r, common_data, belt_specs)
-    return strat.execute()
+    result = strat.execute()
+    
+    # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
+    # Tính toán bộ truyền động hoàn chỉnh
+    try:
+        from .specs import ACTIVE_CHAIN_SPECS
+        
+        # Lấy đường kính puly từ kết quả tính toán
+        pulley_diameter = result.recommended_pulley_diameters_mm.get('A', 500)  # Mặc định 500mm nếu không có
+        
+        # Gọi hàm lựa chọn truyền động
+        transmission_solution = select_transmission(
+            target_velocity=p.V_mps,
+            pulley_diameter=pulley_diameter,
+            motor_rpm=p.motor_rpm,
+            chain_specs=ACTIVE_CHAIN_SPECS
+        )
+        
+        if transmission_solution:
+            result.transmission = transmission_solution
+            print(f"DEBUG: Đã tìm thấy giải pháp truyền động: {transmission_solution}")
+        else:
+            print("DEBUG: Không tìm thấy giải pháp truyền động phù hợp")
+            
+    except Exception as e:
+        print(f"DEBUG: Lỗi khi tính toán truyền động: {e}")
+        result.transmission = None
+    # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
+    
+    return result
+
+# --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
+def select_transmission(target_velocity: float, pulley_diameter: float, motor_rpm: int, chain_specs: list) -> Optional['TransmissionSolution']:
+    """
+    Lựa chọn tổ hợp hộp số và nhông-xích phù hợp
+    
+    Args:
+        target_velocity: Vận tốc băng tải yêu cầu (m/s)
+        pulley_diameter: Đường kính puly (mm)
+        motor_rpm: Tốc độ động cơ (vòng/phút)
+        chain_specs: Danh sách các loại xích có sẵn
+    
+    Returns:
+        TransmissionSolution hoặc None nếu không tìm thấy giải pháp phù hợp
+    """
+    from .models import TransmissionSolution
+    from .specs import STANDARD_GEARBOX_RATIOS
+    
+    # Tính toán yêu cầu
+    rpm_pulley = (target_velocity * 60) / (math.pi * pulley_diameter / 1000)
+    i_total_required = motor_rpm / rpm_pulley
+    
+    print(f"DEBUG TRANSMISSION: target_velocity={target_velocity}, pulley_diameter={pulley_diameter}")
+    print(f"DEBUG TRANSMISSION: motor_rpm={motor_rpm}, rpm_pulley={rpm_pulley:.2f}")
+    print(f"DEBUG TRANSMISSION: i_total_required={i_total_required:.2f}")
+    
+    possible_solutions = []
+    
+    # Vòng lặp chính - Duyệt qua các hộp số
+    for gearbox_ratio in STANDARD_GEARBOX_RATIOS:
+        # Tính tỉ số truyền nhông-xích mục tiêu
+        i_sprocket_target = i_total_required / gearbox_ratio
+        
+        # Giới hạn tỉ số truyền nhông-xích trong khoảng hợp lý (1-7)
+        if i_sprocket_target < 1 or i_sprocket_target > 7:
+            continue
+        
+        # Vòng lặp phụ - Tìm cặp nhông phù hợp
+        for z1 in range(17, 26):  # Số răng nhông dẫn từ 17-25
+            # Tính số răng nhông bị dẫn lý thuyết
+            z2_ideal = z1 * i_sprocket_target
+            z2_actual = round(z2_ideal)
+            
+            # Kiểm tra giới hạn số răng nhông bị dẫn
+            if z2_actual < z1 or z2_actual > 120:
+                continue
+            
+            # Tính lại tỉ số truyền thực tế
+            i_sprocket_actual = z2_actual / z1
+            i_total_actual = gearbox_ratio * i_sprocket_actual
+            
+            # Tính vận tốc băng tải thực tế
+            actual_velocity = (motor_rpm / i_total_actual) * (math.pi * pulley_diameter / 1000) / 60
+            
+            # Tính sai số
+            error = abs(actual_velocity - target_velocity) / target_velocity * 100
+            
+            # Lưu giải pháp
+            solution = TransmissionSolution(
+                gearbox_ratio=gearbox_ratio,
+                drive_sprocket_teeth=z1,
+                driven_sprocket_teeth=z2_actual,
+                chain_pitch_mm=0.0,  # Sẽ được cập nhật sau
+                actual_belt_velocity=actual_velocity,
+                error=error,
+                chain_designation="",  # Sẽ được cập nhật sau
+                total_transmission_ratio=i_total_actual
+            )
+            
+            possible_solutions.append(solution)
+    
+    # Lựa chọn giải pháp tốt nhất
+    if not possible_solutions:
+        print("DEBUG TRANSMISSION: Không tìm thấy giải pháp phù hợp")
+        return None
+    
+    # Sắp xếp theo sai số tăng dần
+    possible_solutions.sort(key=lambda x: x.error)
+    best_solution = possible_solutions[0]
+    
+    # Chọn xích phù hợp dựa trên bước xích
+    # Ưu tiên xích có bước xích nhỏ hơn để giảm tiếng ồn
+    if chain_specs:
+        # Tìm xích có bước xích phù hợp (ví dụ: 12.7mm, 15.875mm, 19.05mm)
+        suitable_chains = [c for c in chain_specs if c.pitch_mm in [12.7, 15.875, 19.05, 25.4]]
+        if suitable_chains:
+            # Chọn xích có bước xích nhỏ nhất
+            best_chain = min(suitable_chains, key=lambda x: x.pitch_mm)
+            best_solution.chain_pitch_mm = best_chain.pitch_mm
+            best_solution.chain_designation = best_chain.designation
+        else:
+            # Nếu không có xích phù hợp, chọn xích đầu tiên
+            best_solution.chain_pitch_mm = chain_specs[0].pitch_mm
+            best_solution.chain_designation = chain_specs[0].designation
+    
+    print(f"DEBUG TRANSMISSION: Giải pháp tốt nhất: gearbox={best_solution.gearbox_ratio}, "
+          f"z1={best_solution.drive_sprocket_teeth}, z2={best_solution.driven_sprocket_teeth}, "
+          f"error={best_solution.error:.2f}%")
+    
+    return best_solution
+# --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
 

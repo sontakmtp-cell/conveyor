@@ -302,6 +302,34 @@ class ProfessionalPDFExporter(FPDF):
         
         r = self.result
         
+        # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
+        # Thông số bộ truyền động hoàn chỉnh
+        if hasattr(r, 'transmission') and r.transmission:
+            self.set_font("DejaVu", "B", 11)
+            self.set_text_color(*COLOR_PRIMARY)
+            self.cell(0, 10, "BỘ TRUYỀN ĐỘNG HOÀN CHỈNH", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            self.ln(2)
+            
+            t = r.transmission
+            transmission_data = {
+                "Hộp số giảm tốc (tỉ số truyền)": f"{t.gearbox_ratio}",
+                "Bộ truyền nhông-xích": f"{t.drive_sprocket_teeth} răng → {t.driven_sprocket_teeth} răng",
+                "Xích (bước)": f"{t.chain_designation} ({t.chain_pitch_mm} mm)",
+                "Tổng tỉ số truyền": f"{t.total_transmission_ratio:.2f}",
+                "Vận tốc thực tế": f"{t.actual_belt_velocity:.3f} m/s",
+                "Sai số so với yêu cầu": f"{t.error:.2f}%",
+            }
+            
+            self.set_font("DejaVu", "", 10)
+            for key, value in transmission_data.items():
+                self.set_fill_color(*COLOR_LIGHT_GREY)
+                self.cell(80, 8, f" {key}", border=1, fill=True)
+                self.set_text_color(0,0,0)
+                self.multi_cell(100, 8, f" {value}", border=1, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            
+            self.ln(5)
+        # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
+        
         # Phân tích
         self.set_font("DejaVu", "B", 11)
         self.set_text_color(*COLOR_SECONDARY)

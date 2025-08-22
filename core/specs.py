@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from typing import List
 from .models import MaterialType, BeltType
 G = 9.81
 VERSION = "2.1 Professional (Refactored)"
@@ -49,3 +50,56 @@ BELT_SPECS = {
 # Trạng thái DB đang dùng (có thể thay trong runtime)
 ACTIVE_MATERIAL_DB = MATERIAL_DB.copy()
 ACTIVE_BELT_SPECS = BELT_SPECS.copy()
+
+# --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
+# Danh sách tỉ số truyền tiêu chuẩn của hộp số giảm tốc
+STANDARD_GEARBOX_RATIOS = [5, 10, 15, 20, 25, 30, 40, 50, 60, 80, 100]
+
+def load_chain_data() -> List['ChainSpec']:
+    """
+    Tải dữ liệu xích từ các file CSV trong thư mục data
+    Trả về danh sách các ChainSpec
+    """
+    from .models import ChainSpec
+    import csv
+    import os
+    
+    chain_specs = []
+    
+    # Đường dẫn đến file CSV
+    csv_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'Bang tra 2.csv')
+    
+    try:
+        with open(csv_path, 'r', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                # Bỏ qua các hàng trống hoặc không có mã xích
+                if not row.get('ANSI Standard Chain Code') or row['ANSI Standard Chain Code'].strip() == '':
+                    continue
+                
+                # Xử lý dữ liệu từ file CSV
+                try:
+                    chain_spec = ChainSpec(
+                        designation=row['ANSI Standard Chain Code'].strip(),
+                        pitch_mm=float(row['Pitch P (mm)'].replace(',', '.')),
+                        inner_width_mm=float(row['Inner Width W (mm)'].replace(',', '.')),
+                        roller_diameter_mm=float(row['Roller Diameter D (mm)'].replace(',', '.')),
+                        pin_diameter_mm=float(row['Pin Diameter d (mm)'].replace(',', '.')),
+                        plate_thickness_mm=float(row['Plate Thickness T (mm)'].replace(',', '.')),
+                        weight_kgpm=float(row['Weight\nkg/m'].replace(',', '.'))
+                    )
+                    chain_specs.append(chain_spec)
+                except (ValueError, KeyError) as e:
+                    # Bỏ qua các hàng có dữ liệu không hợp lệ
+                    continue
+                    
+    except FileNotFoundError:
+        print(f"Không tìm thấy file CSV: {csv_path}")
+    except Exception as e:
+        print(f"Lỗi khi đọc file CSV: {e}")
+    
+    return chain_specs
+
+# Danh sách xích đã tải (cache)
+ACTIVE_CHAIN_SPECS = load_chain_data()
+# --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---

@@ -394,6 +394,9 @@ class Enhanced3DConveyorWindow(QMainWindow):
             corrosive_environment=i.chk_corr_env.isChecked(),
             explosion_proof=i.chk_ex.isChecked(),
             dual_drive_ratio=i.cbo_dual_drive_ratio.currentText(),
+            # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
+            motor_rpm=int(i.cbo_motor_rpm.currentText()),
+            # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
             db_path=self.db_path
         )
         return self.params
