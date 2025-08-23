@@ -6,14 +6,17 @@ from PySide6.QtWidgets import (
     QDockWidget
 )
 from PySide6.QtGui import QAction, QIcon, QActionGroup
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QThread
+
+# --- [BẮT ĐẦU NÂNG CẤP TỐI ƯU HÓA] ---
 from .ui_components_3d_enhanced import InputsPanel, Enhanced3DResultsPanel
-from .chat.chat_panel import ChatPanel  # Add this import
+from .chat.chat_panel import ChatPanel
 from .styles import LIGHT, DARK
 from core.models import ConveyorParameters, CalculationResult
+from core.optimizer.models import OptimizerSettings
 from core.thread_worker import CalculationThread
+from core.optimizer_worker import OptimizerWorker # Import the new worker
 from core.specs import VERSION, COPYRIGHT, STANDARD_WIDTHS, ACTIVE_MATERIAL_DB, ACTIVE_BELT_SPECS
-from core.optimize import optimize_belt_width, optimize_speed
 from reports.exporter_pdf import export_pdf_report
 from reports.exporter_excel import export_excel_report
 from core.db import load_database
@@ -23,6 +26,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from core.licensing import assigned_account_id
+# --- [KẾT THÚC NÂNG CẤP TỐI ƯU HÓA] ---
 
 class Enhanced3DConveyorWindow(QMainWindow):
     def __init__(self):
@@ -75,10 +79,79 @@ class Enhanced3DConveyorWindow(QMainWindow):
             os.environ['INDEX_DIR'] = str(index_dir)
             print(f"Using INDEX_DIR: {os.environ['INDEX_DIR']}")
             
-        self.setWindowTitle(f"Phần mềm Tính toán Băng tải Công nghiệp v{VERSION}")
+        self.setWindowTitle(f"Convayor Calculator AI v{VERSION}")
         self.resize(1600, 1000)
         self.current_theme = "light"
         self.setStyleSheet(LIGHT)
+        
+        # --- [BẮT ĐẦU NÂNG CẤP UI] ---
+        # Cải thiện giao diện tổng thể
+        self.setStyleSheet(LIGHT + """
+            QMainWindow {
+                background-color: #f8fafc;
+            }
+            QTabWidget::pane {
+                border: 1px solid #e2e8f0;
+                background-color: #ffffff;
+                border-radius: 6px;
+            }
+            QTabBar::tab {
+                background-color: #f1f5f9;
+                color: #475569;
+                padding: 8px 16px;
+                margin-right: 2px;
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
+                font-weight: bold;
+            }
+            QTabBar::tab:selected {
+                background-color: #3b82f6;
+                color: #ffffff;
+            }
+            QTabBar::tab:hover {
+                background-color: #60a5fa;
+                color: #ffffff;
+            }
+            QGroupBox {
+                font-weight: bold;
+                font-size: 13px;
+                border: 2px solid #e2e8f0;
+                border-radius: 8px;
+                margin-top: 10px;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+                color: #374151;
+            }
+            /* Loại bỏ CSS cho QPushButton để tránh xung đột với UI components */
+            /* QPushButton {
+                background-color: #3b82f6;
+                color: #ffffff;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 6px;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #2563eb;
+            }
+            QPushButton:pressed {
+                background-color: #1d4ed8;
+            }
+            QPushButton#primary {
+                background-color: #059669;
+                font-size: 14px;
+                padding: 12px 24px;
+            }
+            QPushButton#primary:hover {
+                background-color: #047857;
+            } */
+        """)
+        # --- [KẾT THÚC NÂNG CẤP UI] ---
         
         # Thiết lập icon cho cửa sổ
         try:
@@ -122,7 +195,7 @@ class Enhanced3DConveyorWindow(QMainWindow):
         h.setObjectName("headerFrame")
         lay = QHBoxLayout(h)
         lay.setContentsMargins(15, 5, 15, 5)
-        t1 = QLabel("Phần mềm Tính toán Băng tải Công Nghiệp")
+        t1 = QLabel("Convayor Calculator AI")
         t1.setObjectName("headerTitle")
         t2 = QLabel(f"Phiên bản {VERSION} | DIN 22101, CEMA, ISO 5048")
         t2.setObjectName("headerSubtitle")
@@ -216,8 +289,8 @@ class Enhanced3DConveyorWindow(QMainWindow):
         # Nội dung được lấy từ bản nháp đã duyệt
         manual_html = """
         <html><body style='font-family: Segoe UI, sans-serif; font-size: 15px; line-height: 1.6;'>
-        <h1>Hướng dẫn sử dụng Phần mềm Tính toán Băng tải</h1>
-        <p>Chào mừng bạn đến với Phần mềm Tính toán Băng tải Công nghiệp. Tài liệu này sẽ hướng dẫn bạn từng bước sử dụng phần mềm để thiết kế, phân tích và tối ưu hóa hệ thống băng tải một cách hiệu quả.</p>
+        <h1>Hướng dẫn sử dụng Convayor Calculator AI</h1>
+        <p>Chào mừng bạn đến với Convayor Calculator AI. Tài liệu này sẽ hướng dẫn bạn từng bước sử dụng phần mềm để thiết kế, phân tích và tối ưu hóa hệ thống băng tải một cách hiệu quả.</p>
         <hr>
         <h3>1. Bắt đầu: Đăng nhập và Quản lý tài khoản</h3>
         <p>Khi khởi động, bạn sẽ thấy màn hình đăng nhập.</p>
@@ -261,7 +334,7 @@ class Enhanced3DConveyorWindow(QMainWindow):
         <ol>
             <li><b>TÍNH TOÁN CHI TIẾT:</b> Chạy phân tích đầy đủ và chính xác nhất.</li>
             <li><b>TÍNH TOÁN NHANH:</b> Thực hiện tính toán nhanh cho kết quả sơ bộ.</li>
-            <li><b>TỐI ƯU TỰ ĐỘNG:</b> Phần mềm sẽ tự động đề xuất Bề rộng băng và Tốc độ băng tối ưu.</li>
+            <li><b>TỐI ƯU NÂNG CAO:</b> Phần mềm sẽ tự động tìm kiếm các giải pháp thiết kế tốt nhất dựa trên mục tiêu bạn đã chọn.</li>
         </ol>
         <h3>5. Đọc và phân tích kết quả</h3>
         <p>Kết quả sẽ được hiển thị ở <b>Panel Kết quả</b> bên phải, bao gồm các chỉ số KPIs và các Tab chi tiết (Tổng quan, Cấu trúc, Phân tích kỹ thuật, Chi phí, Tóm tắt, Biểu đồ 2D).</p>
@@ -349,12 +422,15 @@ class Enhanced3DConveyorWindow(QMainWindow):
     def _connect(self):
         self.inputs.btn_calc.clicked.connect(self._full_calculate)
         self.inputs.btn_quick.clicked.connect(self._quick_calculate)
-        self.inputs.btn_opt.clicked.connect(self._auto_optimize)
+        self.inputs.btn_opt.clicked.connect(self._run_advanced_optimization) # Changed
         self.inputs.cbo_material.currentTextChanged.connect(self._on_material_changed)
         self.inputs.cbo_drive.currentTextChanged.connect(self.inputs.update_drive_illustration)
         self.results.chk_t2.stateChanged.connect(self._redraw_all_visualizations)
         self.results.chk_friction.stateChanged.connect(self._redraw_all_visualizations)
         self.results.chk_lift.stateChanged.connect(self._redraw_all_visualizations)
+        # --- [BẮT ĐẦU NÂNG CẤP TỐI ƯU HÓA] ---
+        self.results.optimizer_result_selected.connect(self._apply_optimizer_solution)
+        # --- [KẾT THÚC NÂNG CẤP TỐI ƯU HÓA] ---
 
     def _collect(self) -> ConveyorParameters:
         i = self.inputs
@@ -438,14 +514,145 @@ class Enhanced3DConveyorWindow(QMainWindow):
             self.statusBar().showMessage("Đã hạ tốc độ về mức khuyến cáo theo vật liệu.")
         self._start_thread(self._collect())
 
-    def _auto_optimize(self):
+    # --- [BẮT ĐẦU NÂNG CẤP TỐI ƯU HÓA] ---
+    def _run_advanced_optimization(self):
+        # Tính năng tối ưu hóa nâng cao giờ đây luôn được bật mặc định
+        # Không cần kiểm tra opt_group.isChecked() nữa
+
+        # Hiển thị thông báo "Đang quét vô hạn kết quả, hãy kiên nhẫn chờ đợi !!" trong label trạng thái
+        self.inputs.lbl_optimization_status.setText("🔄 Đang quét vô hạn kết quả, hãy kiên nhẫn chờ đợi !!")
+        self.inputs.lbl_optimization_status.setStyleSheet("""
+            QLabel {
+                color: #dc2626;
+                font-weight: 600;
+                font-size: 14px;
+                padding: 10px;
+                background-color: #fee2e2;
+                border: 1px solid #ef4444;
+                border-radius: 6px;
+                text-align: center;
+                margin: 5px 0px;
+            }
+        """)
+        
+        # Cũng hiển thị thông báo trong status bar
+        self.statusBar().showMessage("🔄 Đang quét vô hạn kết quả, hãy kiên nhẫn chờ đợi !!")
+
         i = self.inputs
-        new_B = optimize_belt_width(i.spn_capacity.value(), i.spn_density.value(), i.spn_speed.value())
-        i.cbo_width.setCurrentText(str(new_B))
-        new_v = optimize_speed(i.cbo_material.currentText(), i.spn_particle.value(), new_B)
-        i.spn_speed.setValue(new_v)
-        self.statusBar().showMessage(f"Tối ưu: Bề rộng {new_B} mm, tốc độ {new_v} m/s.")
-        self._start_thread(self._collect())
+        # Lấy giá trị từ slider (0-100) và chuẩn hóa về (0-1)
+        cost_vs_safety = i.slider_cost_safety.value() / 100.0
+
+        # Tạo đối tượng cài đặt
+        opt_settings = OptimizerSettings(
+            w_cost = 1.0 - cost_vs_safety, # Kéo sang trái (0) là ưu tiên cost
+            w_safety = cost_vs_safety,      # Kéo sang phải (1) là ưu tiên safety
+            w_power = 0.3, # Giữ giá trị mặc định hoặc có thể thêm slider khác
+            max_budget_usd=i.spn_max_budget.value() if i.spn_max_budget.value() > 0 else None,
+            min_belt_safety_factor=i.spn_min_safety_factor.value()
+        )
+
+        base_params = self._collect()
+
+        # Setup and run the worker thread
+        self.opt_thread = QThread()
+        self.opt_worker = OptimizerWorker(base_params, opt_settings)
+        self.opt_worker.moveToThread(self.opt_thread)
+
+        self.opt_thread.started.connect(self.opt_worker.run)
+        self.opt_worker.finished.connect(self._on_optimizer_finished)
+        self.opt_worker.status.connect(self.statusBar().showMessage)
+        # self.opt_worker.progress.connect(self.results.progress.setValue) # Can be implemented later
+        
+        self.opt_thread.start()
+        self._set_buttons(False)
+        self.results.progress.setVisible(True)
+        self.results.progress.setRange(0, 0) # Indeterminate progress bar
+
+    def _on_optimizer_finished(self, results):
+        self.results.progress.setVisible(False)
+        self.results.progress.setRange(0, 100)
+        self._set_buttons(True)
+        
+        # Reset thông báo trạng thái về trạng thái ban đầu
+        self.inputs.lbl_optimization_status.setText("✅ Tối ưu hóa hoàn tất!")
+        self.inputs.lbl_optimization_status.setStyleSheet("""
+            QLabel {
+                color: #059669;
+                font-weight: 600;
+                font-size: 14px;
+                padding: 10px;
+                background-color: #d1fae5;
+                border: 1px solid #10b981;
+                border-radius: 6px;
+                text-align: center;
+                margin: 5px 0px;
+            }
+        """)
+        
+        if not results:
+            QMessageBox.warning(self, "Không có giải pháp", "Không tìm thấy giải pháp tối ưu nào phù hợp với điều kiện của bạn.")
+            # Cập nhật thông báo nếu không có kết quả
+            self.inputs.lbl_optimization_status.setText("❌ Không tìm thấy giải pháp phù hợp")
+            self.inputs.lbl_optimization_status.setStyleSheet("""
+                QLabel {
+                    color: #dc2626;
+                    font-weight: 600;
+                    font-size: 14px;
+                    padding: 10px;
+                    background-color: #fee2e2;
+                    border: 1px solid #ef4444;
+                    border-radius: 6px;
+                    text-align: center;
+                    margin: 5px 0px;
+                }
+            """)
+        else:
+            self.results.update_optimizer_results(results)
+
+        # Tự động reset thông báo về trạng thái ban đầu sau 5 giây
+        QTimer.singleShot(5000, self._reset_optimization_status)
+
+        # Clean up the thread properly
+        if hasattr(self, 'opt_thread'):
+            self.opt_thread.quit()
+            self.opt_thread.wait(5000)  # Wait max 5 seconds
+            if self.opt_thread.isRunning():
+                self.opt_thread.terminate()
+                self.opt_thread.wait()
+            delattr(self, 'opt_thread')
+            delattr(self, 'opt_worker')
+
+    def _reset_optimization_status(self):
+        """Reset thông báo trạng thái tối ưu hóa về trạng thái ban đầu"""
+        self.inputs.lbl_optimization_status.setText("Tính năng tối ưu hóa nâng cao đã sẵn sàng")
+        self.inputs.lbl_optimization_status.setStyleSheet("""
+            QLabel {
+                color: #059669;
+                font-weight: 600;
+                font-size: 14px;
+                padding: 10px;
+                background-color: #d1fae5;
+                border: 1px solid #10b981;
+                border-radius: 6px;
+                text-align: center;
+                margin: 5px 0px;
+            }
+        """)
+    # --- [KẾT THÚC NÂNG CẤP TỐI ƯU HÓA] ---
+
+    def _apply_optimizer_solution(self, candidate):
+        """Cập nhật lại input panel với giải pháp được chọn và chạy tính toán chi tiết."""
+        i = self.inputs
+        i.cbo_width.setCurrentText(str(candidate.belt_width_mm))
+        i.spn_speed.setValue(candidate.belt_speed_mps)
+        i.cbo_belt_type.setCurrentText(candidate.belt_type_name)
+        i.cbo_gearbox_ratio_mode.setCurrentText("Chỉ định")
+        i.spn_gearbox_ratio_user.setValue(candidate.gearbox_ratio)
+
+        # Chạy lại tính toán chi tiết để hiển thị đầy đủ kết quả cho giải pháp đã chọn
+        QTimer.singleShot(100, self._full_calculate)
+        self.statusBar().showMessage(f"Đã áp dụng giải pháp tối ưu. Đang chạy tính toán chi tiết...")
+    # --- [KẾT THÚC NÂNG CẤP TỐI ƯU HÓA] ---
 
     def _on_material_changed(self):
         mat = self.inputs.cbo_material.currentText()
@@ -465,8 +672,9 @@ class Enhanced3DConveyorWindow(QMainWindow):
             # Góc chất tải luôn bằng góc nghiêng tự nhiên, không cần cập nhật spn_surcharge
             
             # Cập nhật label thông tin vật liệu
-            info_text = f"Khối lượng riêng: {density} tấn/m³ | Góc mái: {angle_repose}° | Tốc độ tối đa: {v_max} m/s | Mài mòn: {abrasive} | Nhiệt độ tối đa: {temperature_max}°C | Độ ẩm: {moisture}"
+            info_text = f"Khối lượng riêng: {density} tấn/m³ | Góc mái: {angle_repose}° | Tốc độ tối đa: {v_max} m/s <br> Mài mòn: {abrasive} | Nhiệt độ tối đa: {temperature_max}°C | Độ ẩm: {moisture}"
             self.inputs.lbl_material_info.setText(info_text)
+            self.inputs.lbl_material_info.setWordWrap(True)
             self.inputs.lbl_material_info.setStyleSheet("color: #2563eb; font-style: normal; padding: 5px; background-color: #eff6ff; border: 1px solid #dbeafe; border-radius: 4px;")
             
             # Kiểm tra và điều chỉnh tốc độ nếu cần
@@ -575,7 +783,7 @@ class Enhanced3DConveyorWindow(QMainWindow):
                 ana_report_html += "</ul>"
             self.results.txt_analysis.setHtml(ana_report_html)
 
-            cost_report = (f"PHÂN TÍCH CHI PHÍ (ƯỚC TÍNH)\n{'='*40}\n1. CHI PHÍ ĐẦU TƯ BAN ĐẦU (CAPEX)\n"
+            cost_report = (f"PHÂN TÍCH CHI PHÍ (ƯỚC TÍNH)\n{'-'*40}\n1. CHI PHÍ ĐẦU TƯ BAN ĐẦU (CAPEX)\n"
                            f"   - Chi phí băng tải: ${r.cost_belt:,.2f}\n"
                            f"   - Chi phí con lăn: ${r.cost_idlers:,.2f}\n"
                            f"   - Chi phí kết cấu: ${r.cost_structure:,.2f}\n"
@@ -583,7 +791,7 @@ class Enhanced3DConveyorWindow(QMainWindow):
                            f"   - Chi phí khác (lắp đặt...): ${r.cost_others:,.2f}\n"
                            f"{'-'*40}\n"
                            f"   => TỔNG CHI PHÍ ĐẦU TƯ: ${r.cost_capital_total:,.2f}\n"
-                           f"{'='*40}\n2. CHI PHÍ VẬN HÀNH/NĂM (OPEX)\n"
+                           f"{'-'*40}\n2. CHI PHÍ VẬN HÀNH/NĂM (OPEX)\n"
                            f"   - Chi phí năng lượng/năm: ${r.op_cost_energy_per_year:,.2f}\n"
                            f"   - Chi phí bảo trì/năm: ${r.op_cost_maintenance_per_year:,.2f}\n"
                            f"   => TỔNG CHI PHÍ VẬN HÀNH/NĂM: ${r.op_cost_total_per_year:,.2f}\n")
@@ -676,18 +884,19 @@ class Enhanced3DConveyorWindow(QMainWindow):
 
     def _show_about_dialog(self):
         about_text = f"""
-            <h3>Phần mềm Tính toán Băng tải Công Nghiệp</h3>
+            <h3>Convayor Calculator AI</h3>
             <p><b>Phiên bản:</b> {VERSION}<br>
             <b>Ngày phát hành:</b> 2025</p>
             
             <h4>Tính năng chính:</h4>
             <ul>
                 <li>✔️ Tính toán theo tiêu chuẩn DIN 22101, CEMA, ISO 5048</li>
+                <li>✔️ Tích hợp Trợ lý kỹ thuật trí tuệ nhân tạo</li>
                 <li>✔️ Tự động lựa chọn và tối ưu thiết bị</li>
                 <li>✔️ Phân tích chi tiết các điều kiện vận hành</li>
                 <li>✔️ Báo cáo kỹ thuật và chi phí hoàn chỉnh</li>
                 <li>✔️ Kiểm tra tuân thủ hệ số an toàn</li>
-                <li>✔️ Giao diện Công Nghiệp, thân thiện</li>
+                <li>✔️ Giao diện chuyên Nghiệp, thân thiện</li>
             </ul>
 
             <h4>Tài liệu tham khảo:</h4>

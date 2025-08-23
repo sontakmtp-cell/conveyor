@@ -441,6 +441,9 @@ class CalculationStrategy(ABC):
         print(f"DEBUG FINAL: effective_tension={self.r.effective_tension}")
         print(f"DEBUG FINAL: T1={self.r.T1}, T2={self.r.T2}, max_tension={self.r.max_tension}")
         
+        print(f"DEBUG CALCULATE: transmission_solution={self.r.transmission_solution}")
+        print(f"DEBUG CALCULATE: safety_factor={self.r.safety_factor}")
+        print(f"DEBUG CALCULATE: cost_capital_total={self.r.cost_capital_total}")
         return self.r
 
     def finalize_results(self):
@@ -523,12 +526,29 @@ class CalculationStrategy(ABC):
         self.r.op_cost_energy_per_year = kwh_per_year * 0.12
         self.r.op_cost_maintenance_per_year = self.r.cost_capital_total * 0.02
         self.r.op_cost_total_per_year = self.r.op_cost_energy_per_year + self.r.op_cost_maintenance_per_year
+
+        # --- [BẮT ĐẦU TÍNH TOÁN KHỐI LƯỢNG] ---
+        # Ước tính khối lượng các thành phần
+        belt_mass = self.r.belt_weight_kgpm * self.p.L_m * 2.1
+        
+        Wc, Wr = get_idler_base_weights(self.p.B_mm)
+        idler_mass = (num_carry * Wc) + (num_return * Wr)
+        
+        # Ước tính khối lượng kết cấu và hệ thống truyền động
+        # Giả định giá thép kết cấu là $5/kg và giá hệ thống truyền động là $10/kg
+        structure_mass = self.r.cost_structure / 5.0 if self.r.cost_structure > 0 else self.p.L_m * 50
+        drive_mass = self.r.cost_drive / 10.0 if self.r.cost_drive > 0 else self.r.motor_power_kw * 20
+        
+        self.r.total_mass_kg = belt_mass + idler_mass + structure_mass + drive_mass
+        # --- [KẾT THÚC TÍNH TOÁN KHỐI LƯỢNG] ---
         
         # Debug: in ra các giá trị để kiểm tra
         print(f"DEBUG COSTS: cost_belt={self.r.cost_belt}, cost_idlers={self.r.cost_idlers}")
         print(f"DEBUG COSTS: cost_structure={self.r.cost_structure}, cost_drive={self.r.cost_drive}")
         print(f"DEBUG COSTS: cost_capital_total={self.r.cost_capital_total}")
         print(f"DEBUG COSTS: op_cost_energy_per_year={self.r.op_cost_energy_per_year}")
+        print(f"DEBUG MASS: belt_mass={belt_mass:.2f}, idler_mass={idler_mass:.2f}, structure_mass={structure_mass:.2f}, drive_mass={drive_mass:.2f}")
+        print(f"DEBUG MASS: total_mass_kg={self.r.total_mass_kg:.2f}")
 
     def _calculate_pulleys_and_idlers(self):
         dia_A = 0.0
@@ -711,7 +731,7 @@ def calculate(p: ConveyorParameters) -> CalculationResult:
         from .specs import ACTIVE_CHAIN_SPECS
         
         # Lấy đường kính puly từ kết quả tính toán
-        pulley_diameter = result.recommended_pulley_diameters_mm.get('A', 500)  # mm
+        pulley_diameter = result.recommended_pulley_diameters_mm.get('Puly dẫn động/đầu (Loại A)', 500)  # mm
         
         # Gọi hàm tìm giải pháp tối ưu
         transmission_solution = find_optimal_transmission(
@@ -731,10 +751,25 @@ def calculate(p: ConveyorParameters) -> CalculationResult:
             print(f"DEBUG: Đã tìm thấy giải pháp truyền động: {transmission_solution}")
         else:
             print("DEBUG: Không tìm thấy giải pháp truyền động phù hợp")
+            # --- [BẮT ĐẦU SỬA LỖI] ---
+            # Tạo một transmission_solution mặc định để tránh lỗi UI
+            from .models import TransmissionSolution
+            result.transmission_solution = TransmissionSolution()
+            result.gearbox_ratio_mode = p.gearbox_ratio_mode
+            result.gearbox_ratio_user = p.gearbox_ratio_user
+            print("DEBUG: Đã tạo transmission_solution mặc định để tránh lỗi UI")
+            # --- [KẾT THÚC SỬA LỖI] ---
             
     except Exception as e:
         print(f"DEBUG: Lỗi khi tính toán truyền động: {e}")
-        result.transmission_solution = None
+        # --- [BẮT ĐẦU SỬA LỖI] ---
+        # Tạo transmission_solution mặc định để tránh lỗi UI
+        from .models import TransmissionSolution
+        result.transmission_solution = TransmissionSolution()
+        result.gearbox_ratio_mode = p.gearbox_ratio_mode
+        result.gearbox_ratio_user = p.gearbox_ratio_user
+        print("DEBUG: Đã tạo transmission_solution mặc định sau khi có lỗi")
+        # --- [KẾT THÚC SỬA LỖI] ---
     # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
     
     return result
@@ -875,6 +910,18 @@ def find_optimal_transmission(calculation_params: 'ConveyorParameters',
                         chain_weight_kgpm=getattr(chain_spec, "weight_kgpm", 0.0)
                         # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
                     )
+                    
+                    # --- [BẮT ĐẦU SỬA LỖI UI] ---
+                    # Gán các thuộc tính alias để UI có thể truy cập đúng
+                    solution.gearbox_ratio_mode = "Manual" if use_manual else "Auto"
+                    solution.motor_output_rpm = output_rpm
+                    solution.actual_velocity_mps = actual_velocity
+                    solution.velocity_error_percent = error
+                    solution.required_force_kN = F_required_kN
+                    solution.allowable_force_kN = allowable_kN
+                    solution.chain_weight_kg_per_m = getattr(chain_spec, "weight_kgpm", 0.0)
+                    # --- [KẾT THÚC SỬA LỖI UI] ---
+                    
                     valid_solutions.append(solution)
 
                     # ĐÃ tìm được xích đủ bền cho cặp z1/z2 hiện tại

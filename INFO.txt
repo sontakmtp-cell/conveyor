@@ -1,0 +1,52 @@
+Conveyor Calculator AI - Phần Mềm Tính Toán Băng Tải Công Nghiệp
+================================================================
+
+🎯 TỔNG QUAN
+Conveyor Calculator AI là ứng dụng desktop chuyên nghiệp được thiết kế để tính toán, 
+thiết kế và tối ưu hóa hệ thống băng tải công nghiệp. Ứng dụng tích hợp AI chat 
+thông minh, mô phỏng 3D, và các công cụ tính toán theo tiêu chuẩn quốc tế.
+
+🚀 TÍNH NĂNG CHÍNH
+• Tính toán kỹ thuật theo tiêu chuẩn DIN 22101, CEMA, ISO 5048
+• Tích hợp Google Gemini AI - Trả lời thông minh về kỹ thuật băng tải
+• Mô phỏng 3D với Three.js - Hiển thị mô hình băng tải trực quan
+• RAG System - Tìm kiếm và trích xuất thông tin từ tài liệu kỹ thuật
+• Tối ưu hóa thiết kế tự động với thuật toán di truyền (GA)
+• Báo cáo chuyên nghiệp - Xuất PDF/Excel với fonts tùy chỉnh
+• Hỗ trợ đa ngôn ngữ (Tiếng Việt và Tiếng Anh)
+
+💻 YÊU CẦU HỆ THỐNG
+• Hệ điều hành: Windows 10/11 (64-bit)
+• RAM: Tối thiểu 4GB, khuyến nghị 8GB+
+• CPU: Intel i3/AMD Ryzen 3 trở lên
+• GPU: Hỗ trợ OpenGL 3.3+ (cho 3D)
+• Dung lượng ổ cứng: 2GB trống
+
+🔧 DEPENDENCIES
+• .NET Framework 4.7.2 trở lên (khuyến nghị)
+• Visual C++ Redistributable 2015-2022 (khuyến nghị)
+
+📋 HƯỚNG DẪN CÀI ĐẶT
+1. Đảm bảo máy tính đáp ứng yêu cầu hệ thống
+2. Chạy file cài đặt với quyền Administrator (khuyến nghị)
+3. Chọn thư mục cài đặt phù hợp
+4. Chọn các tùy chọn bổ sung (shortcut, file association)
+5. Hoàn tất cài đặt và khởi chạy ứng dụng
+
+⚠️ LƯU Ý QUAN TRỌNG
+• Ứng dụng yêu cầu kết nối internet để sử dụng AI chat
+• Cần cấu hình API key trong file env_config.txt
+• Đảm bảo Windows Defender không chặn ứng dụng
+• Chạy lần đầu có thể mất thời gian để khởi tạo dữ liệu
+
+🔄 CẬP NHẬT
+• Kiểm tra cập nhật: Help > Check for Updates
+• Tải phiên bản mới: https://drive.google.com/drive/u/1/folders/15gS93Mbv9vItO2HQRhoJF8tNSV27B01e
+• Đăng ký nhận thông báo cập nhật
+
+📞 HỖ TRỢ
+• Email: haingocson@gmail.com
+• Hotline: +840908687499
+
+© 2025 Conveyor Calculator AI. All rights reserved.
+Phát triển với ❤️ tại Việt Nam

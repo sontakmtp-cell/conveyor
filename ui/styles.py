@@ -19,6 +19,39 @@ QPushButton:hover { background:#f1f5f9; }
 QPushButton#primary { background:#3b82f6; color:white; border:none; font-weight:700; }
 QPushButton#primary:hover { background:#2563eb; }
 
+/* Thanh cuộn - Cải thiện giao diện */
+QScrollBar:vertical {
+    background: #f1f5f9;
+    width: 12px;
+    border-radius: 6px;
+    margin: 0px;
+}
+
+QScrollBar::handle:vertical {
+    background: #cbd5e1;
+    border-radius: 6px;
+    min-height: 20px;
+    margin: 2px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #94a3b8;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+}
+
+QScrollArea {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background-color: #ffffff;
+}
+
 /* GroupBox */
 QGroupBox { font-weight:600; font-size:13px; color:#374151; background:#ffffff; border:1px solid #d1d5db; border-radius:10px; margin:12px 0; padding-top:20px; }
 QGroupBox::title { subcontrol-origin: margin; left:12px; top:8px; padding:0 8px; background:white; }
@@ -67,6 +100,39 @@ QPushButton:hover { background:#334155; }
 QPushButton#primary { background:#3b82f6; color:white; border:none; font-weight:700; }
 QPushButton#primary:hover { background:#2563eb; }
 
+/* Thanh cuộn - Cải thiện giao diện */
+QScrollBar:vertical {
+    background: #1e293b;
+    width: 12px;
+    border-radius: 6px;
+    margin: 0px;
+}
+
+QScrollBar::handle:vertical {
+    background: #475569;
+    border-radius: 6px;
+    min-height: 20px;
+    margin: 2px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #64748b;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+}
+
+QScrollArea {
+    border: 1px solid #334155;
+    border-radius: 8px;
+    background-color: #1e293b;
+}
+
 /* GroupBox */
 QGroupBox { font-weight:600; font-size:13px; color:#cbd5e1; background:#1e293b; border:1px solid #334155; border-radius:10px; margin:12px 0; padding-top:20px; }
 QGroupBox::title { subcontrol-origin: margin; left:12px; top:8px; padding:0 8px; background:#1e293b; }
@@ -98,5 +164,5 @@ QLabel#cardValue { color:#f8fafc; font-size:24px; font-weight:bold; }
 QLabel#cardSubtitle { color:#94a3b8; font-size:11px; }
 
 /* Tooltip */
-QToolTip { background-color: #f8fafc; color: #1e293b; padding: 5px; border: 1px solid #cbd5e1; border-radius: 4px; }
+QToolTip { background-color: #1e293b; color: white; padding: 5px; border: 1px solid #334155; border-radius: 4px; }
 """

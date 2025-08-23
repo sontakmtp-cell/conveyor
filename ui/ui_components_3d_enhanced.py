@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QComboBox,
     QDoubleSpinBox, QSpinBox, QLineEdit, QPushButton, QScrollArea, QFrame,
     QTableWidget, QTableWidgetItem, QTextEdit, QTabWidget, QProgressBar, QLabel,
-    QCheckBox, QStackedWidget
+    QCheckBox, QStackedWidget, QSlider
 )
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtGui import QPixmap, QFont
@@ -118,6 +118,94 @@ class InputsPanel(QWidget):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(10, 10, 10, 10)
 
+        # --- [BẮT ĐẦU NÂNG CẤP UI] ---
+        # Cải thiện giao diện tổng thể của input panel
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #ffffff;
+            }
+            QScrollArea {
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                background-color: #ffffff;
+            }
+            QFormLayout {
+                spacing: 8px;
+            }
+            QLabel {
+                color: #374151;
+                font-weight: 500;
+            }
+            QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {
+                padding: 6px;
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
+                background-color: #ffffff;
+                color: #374151;
+            }
+            QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
+                border-color: #3b82f6;
+                outline: none;
+            }
+            QCheckBox {
+                color: #374151;
+                font-weight: 500;
+            }
+            QCheckBox::indicator {
+                width: 16px;
+                height: 16px;
+            }
+            QCheckBox::indicator:unchecked {
+                border: 2px solid #d1d5db;
+                background-color: #ffffff;
+                border-radius: 3px;
+            }
+            QCheckBox::indicator:checked {
+                border: 2px solid #3b82f6;
+                background-color: #3b82f6;
+                border-radius: 3px;
+            }
+            /* Cải thiện giao diện nút */
+            QPushButton {
+                background-color: #ffffff;
+                color: #374151;
+                border: 2px solid #d1d5db;
+                border-radius: 8px;
+                padding: 12px 20px;
+                font-weight: 600;
+                font-size: 14px;
+                min-height: 50px;
+                min-width: 120px;
+                margin: 5px;
+                display: block;
+                visibility: visible;
+                opacity: 1;
+            }
+            QPushButton:hover {
+                background-color: #f8fafc;
+                border-color: #9ca3af;
+            }
+            QPushButton:pressed {
+                background-color: #e5e7eb;
+                border-color: #6b7280;
+            }
+            QPushButton#primary {
+                background-color: #3b82f6;
+                color: white;
+                border-color: #3b82f6;
+                font-weight: 700;
+            }
+            QPushButton#primary:hover {
+                background-color: #2563eb;
+                border-color: #2563eb;
+            }
+            QPushButton#primary:pressed {
+                background-color: #1d4ed8;
+                border-color: #1d4ed8;
+            }
+        """)
+        # --- [KẾT THÚC NÂNG CẤP UI] ---
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         container = QWidget()
@@ -137,20 +225,151 @@ class InputsPanel(QWidget):
         v.addWidget(self._belt_group())
         v.addWidget(self._drive_group())
         v.addWidget(self._env_group())
+        # --- [BẮT ĐẦU NÂNG CẤP TỐI ƯU HÓA] ---
+        v.addWidget(self._optimizer_settings_group())
+        # --- [KẾT THÚC NÂNG CẤP TỐI ƯU HÓA] ---
         v.addStretch(1)
         scroll.setWidget(container)
 
         main_layout.addWidget(scroll)
 
         btn_row = QHBoxLayout()
-        self.btn_calc = QPushButton("TÍNH TOÁN CHI TIẾT")
+        btn_row.setSpacing(10)  # Thêm khoảng cách giữa các nút
+        btn_row.setContentsMargins(10, 10, 10, 10)  # Thêm margin cho layout
+        
+        self.btn_calc = QPushButton("TÍNH TOÁN\nCHI TIẾT")
         self.btn_calc.setObjectName("primary")
-        self.btn_quick = QPushButton("TÍNH TOÁN NHANH")
-        self.btn_opt = QPushButton("TỐI ƯU TỰ ĐỘNG")
+        self.btn_calc.setMinimumHeight(50)  # Đảm bảo nút có chiều cao tối thiểu
+        self.btn_calc.setStyleSheet("""
+            QPushButton {
+                background-color: #3b82f6;
+                color: white;
+                border: 2px solid #3b82f6;
+                border-radius: 8px;
+                padding: 8px 16px;
+                font-weight: 700;
+                font-size: 13px;
+                min-height: 50px;
+                min-width: 140px;
+                margin: 5px;
+                text-align: center;
+                white-space: pre-line;
+            }
+            QPushButton:hover {
+                background-color: #2563eb;
+                border-color: #2563eb;
+            }
+            QPushButton:pressed {
+                background-color: #1d4ed8;
+                border-color: #1d4ed8;
+            }
+        """)
+        
+        self.btn_quick = QPushButton("TÍNH TOÁN\nNHANH")
+        self.btn_quick.setMinimumHeight(50)  # Đảm bảo nút có chiều cao tối thiểu
+        self.btn_quick.setStyleSheet("""
+            QPushButton {
+                background-color: #ffffff;
+                color: #374151;
+                border: 2px solid #d1d5db;
+                border-radius: 8px;
+                padding: 8px 16px;
+                font-weight: 600;
+                font-size: 13px;
+                min-height: 50px;
+                min-width: 140px;
+                margin: 5px;
+                text-align: center;
+                white-space: pre-line;
+            }
+            QPushButton:hover {
+                background-color: #f8fafc;
+                border-color: #9ca3af;
+            }
+            QPushButton:pressed {
+                background-color: #e5e7eb;
+                border-color: #6b7280;
+            }
+        """)
+        
+        self.btn_opt = QPushButton("TỐI ƯU\nNÂNG CAO") # Đổi tên nút
+        self.btn_opt.setMinimumHeight(50)  # Đảm bảo nút có chiều cao tối thiểu
+        self.btn_opt.setStyleSheet("""
+            QPushButton {
+                background-color: #ffffff;
+                color: #374151;
+                border: 2px solid #d1d5db;
+                border-radius: 8px;
+                padding: 8px 16px;
+                font-weight: 600;
+                font-size: 13px;
+                min-height: 50px;
+                min-width: 140px;
+                margin: 5px;
+                text-align: center;
+                white-space: pre-line;
+            }
+            QPushButton:hover {
+                background-color: #f8fafc;
+                border-color: #9ca3af;
+            }
+            QPushButton:pressed {
+                background-color: #e5e7eb;
+                border-color: #6b7280;
+            }
+        """)
+        
         btn_row.addWidget(self.btn_calc, 2)
         btn_row.addWidget(self.btn_quick, 1)
         btn_row.addWidget(self.btn_opt, 1)
-        main_layout.addLayout(btn_row)
+        
+        # Thêm CSS cho container chứa nút để đảm bảo hiển thị
+        btn_container = QWidget()
+        btn_container.setLayout(btn_row)
+        btn_container.setStyleSheet("""
+            QWidget {
+                background-color: #f8fafc;
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                padding: 10px;
+                margin: 10px;
+            }
+            QPushButton {
+                background-color: #ffffff;
+                color: #374151;
+                border: 2px solid #d1d5db;
+                border-radius: 8px;
+                padding: 12px 20px;
+                font-weight: 600;
+                font-size: 14px;
+                min-height: 50px;
+                min-width: 120px;
+                margin: 5px;
+            }
+            QPushButton:hover {
+                background-color: #f8fafc;
+                border-color: #9ca3af;
+            }
+            QPushButton:pressed {
+                background-color: #e5e7eb;
+                border-color: #6b7280;
+            }
+            QPushButton#primary {
+                background-color: #3b82f6;
+                color: white;
+                border-color: #3b82f6;
+                font-weight: 700;
+            }
+            QPushButton#primary:hover {
+                background-color: #2563eb;
+                border-color: #2563eb;
+            }
+            QPushButton#primary:pressed {
+                background-color: #1d4ed8;
+                border-color: #1d4ed8;
+            }
+        """)
+        main_layout.addWidget(btn_container)
 
         self.cbo_drive.currentTextChanged.connect(self.update_drive_illustration)
         self.update_drive_illustration(self.cbo_drive.currentText())
@@ -244,6 +463,33 @@ class InputsPanel(QWidget):
         self.chk_dusty_env = QCheckBox("Môi trường bụi bặm")
         self.chk_corr_env = QCheckBox("Môi trường ăn mòn")
         self.chk_ex = QCheckBox("Yêu cầu chống nổ")
+
+        # --- [BẮT ĐẦU NÂNG CẤP TỐI ƯU HÓA] ---
+        self.opt_group = QGroupBox("Cài đặt Tối ưu hóa Nâng cao")
+        # Hủy bỏ nút tick chọn - tính năng này mặc định luôn được Bật
+        # self.opt_group.setCheckable(True)
+        # self.opt_group.setChecked(False) # Mặc định tắt
+
+        self.slider_cost_safety = QSlider(Qt.Horizontal)
+        self.slider_cost_safety.setRange(0, 100)
+        self.slider_cost_safety.setValue(60) # Mặc định 60% Cost, 40% Safety
+
+        self.slider_power_speed = QSlider(Qt.Horizontal)
+        self.slider_power_speed.setRange(0, 100)
+        self.slider_power_speed.setValue(30) # Mặc định 30% Power, 70% Speed
+
+        self.spn_max_budget = QDoubleSpinBox()
+        self.spn_max_budget.setRange(0, 1_000_000_000)
+        self.spn_max_budget.setDecimals(0)
+        self.spn_max_budget.setSuffix(" $")
+        self.spn_max_budget.setGroupSeparatorShown(True)
+
+
+        self.spn_min_safety_factor = QDoubleSpinBox()
+        self.spn_min_safety_factor.setRange(1.0, 20.0)
+        self.spn_min_safety_factor.setDecimals(1)
+        self.spn_min_safety_factor.setValue(8.0)
+        # --- [KẾT THÚC NÂNG CẤP TỐI ƯU HÓA] ---
 
     def _project_group(self) -> QGroupBox:
         g = QGroupBox("Thông tin dự án")
@@ -381,6 +627,54 @@ class InputsPanel(QWidget):
         f.addRow("Điều kiện đặc biệt:", box)
         return g
 
+    # --- [BẮT ĐẦU NÂNG CẤP TỐI ƯU HÓA] ---
+    def _optimizer_settings_group(self) -> QGroupBox:
+        f = QFormLayout(self.opt_group)
+
+        # Thêm label thông báo trạng thái tối ưu hóa
+        self.lbl_optimization_status = QLabel("Tính năng tối ưu hóa nâng cao đã sẵn sàng")
+        self.lbl_optimization_status.setStyleSheet("""
+            QLabel {
+                color: #059669;
+                font-weight: 600;
+                font-size: 14px;
+                padding: 10px;
+                background-color: #d1fae5;
+                border: 1px solid #10b981;
+                border-radius: 6px;
+                text-align: center;
+                margin: 5px 0px;
+            }
+        """)
+        self.lbl_optimization_status.setAlignment(Qt.AlignCenter)
+        f.addRow(self.lbl_optimization_status)
+
+        # Sliders for weights
+        slider_layout = QFormLayout()
+        
+        cost_safety_label = QLabel("Chi phí Thấp nhất<br><b style='color:#3b82f6;'>vs</b><br>Bền nhất")
+        cost_safety_label.setWordWrap(True)
+        cost_safety_label.setToolTip("Kéo về bên trái để ưu tiên chi phí, kéo về bên phải để ưu tiên độ bền và hệ số an toàn cao.")
+        slider_layout.addRow(cost_safety_label, self.slider_cost_safety)
+
+        power_speed_label = QLabel("Tiết kiệm Năng lượng<br><b style='color:#3b82f6;'>vs</b><br>Nhanh nhất")
+        power_speed_label.setWordWrap(True)
+        power_speed_label.setToolTip("Kéo về bên trái để ưu tiên động cơ công suất nhỏ, kéo về bên phải để ưu tiên tốc độ băng tải cao.")
+        slider_layout.addRow(power_speed_label, self.slider_power_speed)
+        
+        f.addRow("Mục tiêu của bạn là gì?", slider_layout)
+
+        # Constraints
+        constraints_group = QGroupBox("Ràng buộc (Tùy chọn)")
+        constraints_layout = QFormLayout(constraints_group)
+        constraints_layout.addRow("Ngân sách tối đa ($):", self.spn_max_budget)
+        constraints_layout.addRow("HS An toàn băng >=", self.spn_min_safety_factor)
+        
+        f.addRow(constraints_group)
+
+        return self.opt_group
+    # --- [KẾT THÚC NÂNG CẤP TỐI ƯU HÓA] ---
+
     @Slot(str)
     def update_drive_illustration(self, drive_type_text: str) -> None:
         sel = (drive_type_text or "").strip().lower()
@@ -442,16 +736,98 @@ class CardsRow(QWidget):
 # ==========================
 
 class Enhanced3DResultsPanel(QWidget):
+    optimizer_result_selected = Signal(object) # Signal to emit DesignCandidate
+
     def __init__(self) -> None:
         super().__init__()
         root = QVBoxLayout(self)
         root.setContentsMargins(10, 10, 10, 10)
+
+        # --- [BẮT ĐẦU NÂNG CẤP UI] ---
+        # Cải thiện giao diện tổng thể của results panel
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #ffffff;
+            }
+            QTabWidget::pane {
+                border: 1px solid #e2e8f0;
+                background-color: #ffffff;
+                border-radius: 6px;
+            }
+            QTabBar::tab {
+                background-color: #f1f5f9;
+                color: #475569;
+                padding: 8px 16px;
+                margin-right: 2px;
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
+                font-weight: bold;
+            }
+            QTabBar::tab:selected {
+                background-color: #3b82f6;
+                color: #ffffff;
+            }
+            QTabBar::tab:hover {
+                background-color: #60a5fa;
+                color: #ffffff;
+            }
+            QTableWidget {
+                gridline-color: #e5e7eb;
+                background-color: #ffffff;
+                alternate-background-color: #f8fafc;
+                selection-background-color: #3b82f6;
+                selection-color: #ffffff;
+                border: 1px solid #e2e8f0;
+                border-radius: 4px;
+            }
+            QHeaderView::section {
+                background-color: #1e40af;
+                color: #ffffff;
+                padding: 8px;
+                border: none;
+                font-weight: bold;
+            }
+            QTextEdit {
+                border: 1px solid #e2e8f0;
+                border-radius: 4px;
+                background-color: #ffffff;
+                color: #374151;
+                font-family: 'Segoe UI', sans-serif;
+                font-size: 12px;
+            }
+            QProgressBar {
+                border: 1px solid #e2e8f0;
+                border-radius: 4px;
+                background-color: #f1f5f9;
+                text-align: center;
+                font-weight: bold;
+            }
+            QProgressBar::chunk {
+                background-color: #3b82f6;
+                border-radius: 3px;
+            }
+        """)
+        # --- [KẾT THÚC NÂNG CẤP UI] ---
 
         self.cards = CardsRow()
         root.addWidget(self.cards)
 
         self.tabs = QTabWidget()
         root.addWidget(self.tabs, 1)
+
+        # --- [BẮT ĐẦU NÂNG CẤP TỐI ƯU HÓA]
+        # Tab Kết quả Tối ưu
+        w_opt = QWidget()
+        l_opt = QVBoxLayout(w_opt)
+        self.tbl_optimizer_results = QTableWidget()
+        self.tbl_optimizer_results.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.tbl_optimizer_results.setSelectionBehavior(QTableWidget.SelectRows)
+        self.tbl_optimizer_results.setAlternatingRowColors(True)
+        self.tbl_optimizer_results.doubleClicked.connect(self._on_optimizer_result_selected)
+        l_opt.addWidget(self.tbl_optimizer_results)
+        self.tabs.insertTab(0, w_opt, "🏆 Kết quả Tối ưu")
+        self._optimizer_results_data = [] # To store the list of DesignCandidate
+        # --- [KẾT THÚC NÂNG CẤP TỐI ƯU HÓA]
 
         # Tab Tổng quan
         w_over = QWidget(); lo = QVBoxLayout(w_over)
@@ -464,18 +840,63 @@ class Enhanced3DResultsPanel(QWidget):
         # Tab Cấu trúc (Puly & Con lăn)
         w_struct = QWidget()
         l_struct = QVBoxLayout(w_struct)
+        
+        # --- [BẮT ĐẦU NÂNG CẤP UI] ---
+        # Cải thiện styling cho tab Cấu trúc đề xuất
+        w_struct.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                font-size: 14px;
+                border: 2px solid #3b82f6;
+                border-radius: 8px;
+                margin-top: 10px;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+                color: #1e40af;
+            }
+        """)
+        # --- [KẾT THÚC NÂNG CẤP UI] ---
+        
         g_pulleys = QGroupBox("Đề xuất Puly")
         l_pulleys = QVBoxLayout(g_pulleys)
         self.tbl_pulleys = QTableWidget()
         self.tbl_pulleys.setColumnCount(2)
         self.tbl_pulleys.setHorizontalHeaderLabels(["Loại Puly", "Đường kính đề xuất (mm)"])
         self.tbl_pulleys.horizontalHeader().setStretchLastSection(True)
+        # --- [BẮT ĐẦU NÂNG CẤP UI] ---
+        # Cải thiện styling cho bảng Puly
+        self.tbl_pulleys.setStyleSheet("""
+            QTableWidget {
+                gridline-color: #e5e7eb;
+                background-color: #ffffff;
+                alternate-background-color: #f8fafc;
+                selection-background-color: #3b82f6;
+                selection-color: #ffffff;
+            }
+            QHeaderView::section {
+                background-color: #1e40af;
+                color: #ffffff;
+                padding: 8px;
+                border: none;
+                font-weight: bold;
+            }
+        """)
+        # --- [KẾT THÚC NÂNG CẤP UI] ---
         l_pulleys.addWidget(self.tbl_pulleys)
+        
         g_idlers = QGroupBox("Đề xuất Con lăn & Khoảng cách")
         f_idlers = QFormLayout(g_idlers)
-        self.lbl_spacing_carry = QLabel("---"); self.lbl_spacing_carry.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        self.lbl_spacing_return = QLabel("---"); self.lbl_spacing_return.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        self.lbl_transition_dist = QLabel("---"); self.lbl_transition_dist.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        # --- [BẮT ĐẦU NÂNG CẤP UI] ---
+        # Cải thiện styling cho labels
+        label_style = "font-family: 'Segoe UI'; font-size: 12px; font-weight: bold; color: #1e40af; padding: 5px; background-color: #eff6ff; border-radius: 4px;"
+        # --- [KẾT THÚC NÂNG CẤP UI] ---
+        self.lbl_spacing_carry = QLabel("---"); self.lbl_spacing_carry.setStyleSheet(label_style)
+        self.lbl_spacing_return = QLabel("---"); self.lbl_spacing_return.setStyleSheet(label_style)
+        self.lbl_transition_dist = QLabel("---"); self.lbl_transition_dist.setStyleSheet(label_style)
         f_idlers.addRow("Khoảng cách con lăn nhánh tải:", self.lbl_spacing_carry)
         f_idlers.addRow("Khoảng cách con lăn nhánh về:", self.lbl_spacing_return)
         f_idlers.addRow("Khoảng cách chuyển tiếp (tối thiểu):", self.lbl_transition_dist)
@@ -484,6 +905,25 @@ class Enhanced3DResultsPanel(QWidget):
         
         # Thêm khu vực hiển thị bộ truyền động hoàn chỉnh
         g_transmission = QGroupBox("Bộ truyền động hoàn chỉnh")
+        # --- [BẮT ĐẦU NÂNG CẤP UI] ---
+        # Cải thiện styling cho bộ truyền động
+        g_transmission.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                font-size: 14px;
+                border: 2px solid #059669;
+                border-radius: 8px;
+                margin-top: 10px;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+                color: #047857;
+            }
+        """)
+        # --- [KẾT THÚC NÂNG CẤP UI] ---
         f_transmission = QFormLayout(g_transmission)
         
         # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
@@ -497,8 +937,10 @@ class Enhanced3DResultsPanel(QWidget):
         
         self.lbl_gearbox_ratio = QLabel("---"); self.lbl_gearbox_ratio.setFont(QFont("Segoe UI", 11, QFont.Bold))
         self.lbl_chain_designation = QLabel("---"); self.lbl_chain_designation.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        self.lbl_drive_sprocket = QLabel("---"); self.lbl_drive_sprocket.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        self.lbl_driven_sprocket = QLabel("---"); self.lbl_driven_sprocket.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        # --- [BẮT ĐẦU NÂNG CẤP UI] ---
+        # Gộp số răng nhông dẫn và bị dẫn thành một hàng
+        self.lbl_sprocket_teeth = QLabel("---"); self.lbl_sprocket_teeth.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        # --- [KẾT THÚC NÂNG CẤP UI] ---
         self.lbl_actual_velocity = QLabel("---"); self.lbl_actual_velocity.setFont(QFont("Segoe UI", 11, QFont.Bold))
         self.lbl_velocity_error = QLabel("---"); self.lbl_velocity_error.setFont(QFont("Segoe UI", 11, QFont.Bold))
         self.lbl_total_ratio = QLabel("---"); self.lbl_total_ratio.setFont(QFont("Segoe UI", 11, QFont.Bold))
@@ -511,10 +953,28 @@ class Enhanced3DResultsPanel(QWidget):
         self.lbl_chain_weight = QLabel("---"); self.lbl_chain_weight.setFont(QFont("Segoe UI", 11, QFont.Bold))
         # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
         
+        # --- [BẮT ĐẦU NÂNG CẤP UI] ---
+        # Cải thiện styling cho tất cả labels trong bộ truyền động
+        transmission_label_style = "font-family: 'Segoe UI'; font-size: 11px; font-weight: bold; color: #047857; padding: 6px; background-color: #ecfdf5; border-radius: 4px; border: 1px solid #d1fae5;"
+        
+        self.lbl_motor_output_rpm.setStyleSheet(transmission_label_style)
+        self.lbl_chain_designation.setStyleSheet(transmission_label_style)
+        self.lbl_sprocket_teeth.setStyleSheet(transmission_label_style)
+        self.lbl_actual_velocity.setStyleSheet(transmission_label_style)
+        self.lbl_velocity_error.setStyleSheet(transmission_label_style)
+        self.lbl_total_ratio.setStyleSheet(transmission_label_style)
+        self.lbl_required_force.setStyleSheet(transmission_label_style)
+        self.lbl_allowable_force.setStyleSheet(transmission_label_style)
+        self.lbl_safety_margin.setStyleSheet(transmission_label_style)
+        self.lbl_chain_weight.setStyleSheet(transmission_label_style)
+        # --- [KẾT THÚC NÂNG CẤP UI] ---
+        
         f_transmission.addRow("Tốc độ đầu ra động cơ:", self.lbl_motor_output_rpm)
         f_transmission.addRow("Mã xích (ANSI/ISO):", self.lbl_chain_designation)
-        f_transmission.addRow("Số răng nhông dẫn:", self.lbl_drive_sprocket)
-        f_transmission.addRow("Số răng nhông bị dẫn:", self.lbl_driven_sprocket)
+        # --- [BẮT ĐẦU NÂNG CẤP UI] ---
+        # Gộp số răng nhông dẫn và bị dẫn thành một hàng
+        f_transmission.addRow("Số răng nhông dẫn/Bị dẫn:", self.lbl_sprocket_teeth)
+        # --- [KẾT THÚC NÂNG CẤP UI] ---
         f_transmission.addRow("Vận tốc băng tải (m/s):", self.lbl_actual_velocity)
         f_transmission.addRow("Sai số vận tốc (%):", self.lbl_velocity_error)
         
@@ -597,15 +1057,50 @@ class Enhanced3DResultsPanel(QWidget):
         self._current_result = None
         self._current_theme = "light"
 
+    # --- [BẮT ĐẦU NÂNG CẤP TỐI ƯU HÓA]
+    def update_optimizer_results(self, results: list):
+        """Hiển thị kết quả từ optimizer vào bảng."""
+        self._optimizer_results_data = results
+        self.tbl_optimizer_results.clear()
+        
+        headers = ["Rank", "Điểm Fitness", "Bề rộng (mm)", "Tốc độ (m/s)", "Loại băng", "Tổng chi phí ($)", "Công suất (kW)", "HS An toàn Băng", "HS An toàn Xích"]
+        self.tbl_optimizer_results.setColumnCount(len(headers))
+        self.tbl_optimizer_results.setHorizontalHeaderLabels(headers)
+        self.tbl_optimizer_results.setRowCount(len(results))
+
+        for i, candidate in enumerate(results):
+            res = candidate.calculation_result
+            trans = getattr(res, 'transmission_solution', None)
+
+            self.tbl_optimizer_results.setItem(i, 0, QTableWidgetItem(str(i + 1)))
+            self.tbl_optimizer_results.setItem(i, 1, QTableWidgetItem(f"{candidate.fitness_score:.4f}"))
+            self.tbl_optimizer_results.setItem(i, 2, QTableWidgetItem(str(candidate.belt_width_mm)))
+            self.tbl_optimizer_results.setItem(i, 3, QTableWidgetItem(f"{candidate.belt_speed_mps:.2f}"))
+            self.tbl_optimizer_results.setItem(i, 4, QTableWidgetItem(candidate.belt_type_name))
+            self.tbl_optimizer_results.setItem(i, 5, QTableWidgetItem(f"{getattr(res, 'cost_capital_total', 0):,.0f}"))
+            self.tbl_optimizer_results.setItem(i, 6, QTableWidgetItem(f"{getattr(res, 'required_power_kw', 0):.2f}"))
+            self.tbl_optimizer_results.setItem(i, 7, QTableWidgetItem(f"{getattr(res, 'safety_factor', 0):.2f}"))
+            self.tbl_optimizer_results.setItem(i, 8, QTableWidgetItem(f"{getattr(trans, 'safety_margin', 0):.2f}" if trans else "N/A"))
+
+        self.tbl_optimizer_results.resizeColumnsToContents()
+        self.tabs.setCurrentIndex(0) # Chuyển sang tab kết quả tối ưu
+
+    @Slot()
+    def _on_optimizer_result_selected(self, model_index):
+        """Xử lý khi người dùng double-click vào một kết quả."""
+        selected_row = model_index.row()
+        if 0 <= selected_row < len(self._optimizer_results_data):
+            selected_candidate = self._optimizer_results_data[selected_row]
+            self.optimizer_result_selected.emit(selected_candidate)
+    # --- [KẾT THÚC NÂNG CẤP TỐI ƯU HÓA] ---
+
     def update_visualizations(self, params, result, theme: str = "light") -> None:
         self._current_params = params
         self._current_result = result
         self._current_theme = theme
 
         self._update_structural_tab(result)
-        # --- [BẮT ĐẦU NÂNG CẤP] ---
         self._update_analysis_tab(result)
-        # --- [KẾT THÚC NÂNG CẤP] ---
 
         plot_opts = {
             "show_t2": self.chk_t2.isChecked(),
@@ -622,148 +1117,144 @@ class Enhanced3DResultsPanel(QWidget):
                 self.viz_3d.update_visualization(params, result, theme=theme)
             except Exception:
                 pass
-    
-    def _update_structural_tab(self, r):
-        """Cập nhật dữ liệu cho tab Cấu trúc (Puly & Con lăn)."""
-        pulleys_data = getattr(r, 'recommended_pulley_diameters_mm', {})
-        self.tbl_pulleys.setRowCount(len(pulleys_data))
-        for i, (name, dia) in enumerate(pulleys_data.items()):
-            self.tbl_pulleys.setItem(i, 0, QTableWidgetItem(str(name)))
-            self.tbl_pulleys.setItem(i, 1, QTableWidgetItem(f"{dia:.0f} mm"))
-        self.tbl_pulleys.resizeColumnsToContents()
 
-        idlers_data = getattr(r, 'recommended_idler_spacing_m', {})
-        self.lbl_spacing_carry.setText(f"{idlers_data.get('Nhánh tải (đề xuất)', 0):.2f} m")
-        self.lbl_spacing_return.setText(f"{idlers_data.get('Nhánh về (đề xuất)', 0):.2f} m")
+    def _update_structural_tab(self, result) -> None:
+        """Cập nhật tab 'Cấu trúc đề xuất' với dữ liệu từ kết quả tính toán."""
+        if not result:
+            return
+
+        # Cập nhật bảng Puly
+        self.tbl_pulleys.setRowCount(0)
+        drum_diameter = getattr(result, 'drum_diameter_mm', 500)
+        pulleys = {
+            "Puly chủ động": drum_diameter,
+            "Puly bị động": drum_diameter,
+            "Puly đổi hướng": drum_diameter * 0.75,
+            "Puly căng": drum_diameter * 0.75,
+        }
+        self.tbl_pulleys.setRowCount(len(pulleys))
+        for i, (name, diameter) in enumerate(pulleys.items()):
+            self.tbl_pulleys.setItem(i, 0, QTableWidgetItem(name))
+            self.tbl_pulleys.setItem(i, 1, QTableWidgetItem(f"{diameter:.0f}"))
+
+        # Cập nhật thông tin con lăn
+        recommended_spacing = getattr(result, 'recommended_idler_spacing_m', {})
+        transition_distance = getattr(result, 'transition_distance_m', 0.0)
         
-        transition_dist = getattr(r, 'transition_distance_m', 0.0)
-        self.lbl_transition_dist.setText(f"{transition_dist:.3f} m")
-        
-        # Cập nhật thông tin bộ truyền động hoàn chỉnh
-        if hasattr(r, 'transmission_solution') and r.transmission_solution:
-            t = r.transmission_solution
-            
-            # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
-            # Hiển thị thông tin về chế độ hộp số
-            if hasattr(r, 'gearbox_ratio_mode'):
-                mode_text = "Chỉ định" if r.gearbox_ratio_mode.lower() == "manual" else "Tự động tính toán"
-                self.lbl_gearbox_mode.setText(mode_text)
-                self.lbl_gearbox_ratio_used.setText(f"{t.gearbox_ratio:.1f}")
-            else:
-                self.lbl_gearbox_mode.setText("Tự động tính toán")
-                self.lbl_gearbox_ratio_used.setText(f"{t.gearbox_ratio:.1f}")
-            # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
-            
-            # Debug: In ra thông tin về hộp số để kiểm tra
-            print(f"DEBUG UI: gearbox_mode={getattr(r, 'gearbox_ratio_mode', 'N/A')}, gearbox_ratio_user={getattr(r, 'gearbox_ratio_user', 'N/A')}")
-            print(f"DEBUG UI: transmission_solution.gearbox_ratio={t.gearbox_ratio}")
-            
-            # Tính toán và hiển thị tốc độ đầu ra động cơ
-            motor_rpm = getattr(r, 'motor_rpm', 1450)  # Lấy tốc độ động cơ từ kết quả
-            output_rpm = motor_rpm / t.gearbox_ratio
-            
-            # Debug: In ra các giá trị để kiểm tra
-            print(f"DEBUG UI: motor_rpm={motor_rpm}, gearbox_ratio={t.gearbox_ratio}, output_rpm={output_rpm:.2f}")
-            
-            self.lbl_motor_output_rpm.setText(f"{output_rpm:.0f} rpm")
-            
-            self.lbl_gearbox_ratio.setText(f"{t.gearbox_ratio:.1f}")
-            # Hiển thị mã xích với cả tiêu chuẩn ANSI và ISO
-            if hasattr(t, 'chain_spec') and t.chain_spec:
-                ansi_code = t.chain_spec.ansi_code or ""
-                iso_code = t.chain_spec.iso_code or ""
-                if ansi_code and iso_code:
-                    self.lbl_chain_designation.setText(f"{ansi_code} / {iso_code}")
-                elif ansi_code:
-                    self.lbl_chain_designation.setText(f"{ansi_code} (ANSI)")
-                elif iso_code:
-                    self.lbl_chain_designation.setText(f"{iso_code} (ISO)")
+        self.lbl_spacing_carry.setText(f"{recommended_spacing.get('Nhánh tải (đề xuất)', 0.0):.2f} m")
+        self.lbl_spacing_return.setText(f"{recommended_spacing.get('Nhánh về (đề xuất)', 0.0):.2f} m")
+        self.lbl_transition_dist.setText(f"{transition_distance:.2f} m (tối thiểu)")
+
+        # Cập nhật thông tin bộ truyền động
+        trans = getattr(result, 'transmission_solution', None)
+        if trans:
+            # --- [BẮT ĐẦU SỬA LỖI] ---
+            # Sử dụng đúng tên thuộc tính từ TransmissionSolution
+            self.lbl_gearbox_mode.setText(getattr(trans, 'gearbox_ratio_mode', 'N/A'))
+            self.lbl_gearbox_ratio_used.setText(f"{getattr(trans, 'gearbox_ratio', 0):.2f}")
+            # Lấy tốc độ động cơ từ kết quả tính toán thay vì từ transmission_solution
+            motor_rpm = getattr(result, 'motor_rpm', 1450)
+            self.lbl_motor_output_rpm.setText(f"{motor_rpm:.0f} RPM")
+            self.lbl_gearbox_ratio.setText(f"{getattr(trans, 'gearbox_ratio', 0):.2f}")
+            # --- [BẮT ĐẦU NÂNG CẤP HIỂN THỊ MÃ XÍCH] ---
+            # Hiển thị mã xích với cả ANSI và ISO theo định dạng rõ ràng
+            chain_designation = getattr(trans, 'chain_designation', 'N/A')
+            if chain_designation != 'N/A':
+                # Tách mã xích ANSI và ISO nếu có
+                if '/' in chain_designation and chain_designation.endswith(' (ANSI/ISO)'):
+                    # Xử lý format mới: "25/05B (ANSI/ISO)"
+                    ansi_part, iso_part = chain_designation.split('/', 1)
+                    iso_part = iso_part.replace(' (ANSI/ISO)', '')
+                    self.lbl_chain_designation.setText(f"<b>{ansi_part}/{iso_part}</b> <span style='color: #6b7280;'>(ANSI/ISO)</span>")
+                elif chain_designation.endswith(' (ANSI)'):
+                    # Xử lý format mới: "25 (ANSI)"
+                    ansi_part = chain_designation.replace(' (ANSI)', '')
+                    self.lbl_chain_designation.setText(f"<b>{ansi_part}</b> <span style='color: #6b7280;'>(ANSI)</span>")
+                elif chain_designation.endswith(' (ISO)'):
+                    # Xử lý format mới: "05B (ISO)"
+                    iso_part = chain_designation.replace(' (ISO)', '')
+                    self.lbl_chain_designation.setText(f"<b>{iso_part}</b> <span style='color: #6b7280;'>(ISO)</span>")
+                elif '/' in chain_designation:
+                    # Xử lý format cũ: "25/05B" (để tương thích ngược)
+                    ansi_part, iso_part = chain_designation.split('/', 1)
+                    self.lbl_chain_designation.setText(f"<b>{ansi_part}/{iso_part}</b> <span style='color: #6b7280;'>(ANSI/ISO)</span>")
                 else:
-                    self.lbl_chain_designation.setText(t.chain_designation)
+                    # Nếu chỉ có một loại, hiển thị rõ ràng với tiêu chuẩn
+                    # Kiểm tra xem có phải là ANSI hay ISO dựa trên format
+                    if any(char.isdigit() and char in '0123456789' for char in chain_designation):
+                        if 'A' in chain_designation or 'B' in chain_designation:
+                            self.lbl_chain_designation.setText(f"<b>{chain_designation}</b> <span style='color: #6b7280;'>(ANSI)</span>")
+                        else:
+                            self.lbl_chain_designation.setText(f"<b>{chain_designation}</b> <span style='color: #6b7280;'>(ISO)</span>")
+                    else:
+                        self.lbl_chain_designation.setText(f"<b>{chain_designation}</b>")
             else:
-                self.lbl_chain_designation.setText(t.chain_designation)
-            self.lbl_drive_sprocket.setText(f"{t.drive_sprocket_teeth} răng")
-            self.lbl_driven_sprocket.setText(f"{t.driven_sprocket_teeth} răng")
-            self.lbl_actual_velocity.setText(f"{t.actual_belt_velocity:.3f} m/s")
-            self.lbl_velocity_error.setText(f"{t.error:.2f}%")
-            self.lbl_total_ratio.setText(f"{t.total_transmission_ratio:.2f}")
-            
-            # --- [BẮT ĐẦU NÂNG CẤP THEO KẾ HOẠCH] ---
-            # Cập nhật các trường mới theo kế hoạch Plan C
-            self.lbl_required_force.setText(f"{t.required_force_kN:.2f} kN")
-            self.lbl_allowable_force.setText(f"{t.allowable_kN:.2f} kN")
-            self.lbl_safety_margin.setText(f"{t.safety_margin:.2f}")
-            self.lbl_chain_weight.setText(f"{t.chain_weight_kgpm:.3f} kg/m")
-            # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
+                self.lbl_chain_designation.setText("N/A")
+            # --- [KẾT THÚC NÂNG CẤP HIỂN THỊ MÃ XÍCH] ---
+            # --- [BẮT ĐẦU NÂNG CẤP UI] ---
+            # Gộp số răng nhông dẫn và bị dẫn thành một hàng
+            self.lbl_sprocket_teeth.setText(f"{getattr(trans, 'drive_sprocket_teeth', 0)}/{getattr(trans, 'driven_sprocket_teeth', 0)}")
+            # --- [KẾT THÚC NÂNG CẤP UI] ---
+            self.lbl_actual_velocity.setText(f"{getattr(trans, 'actual_velocity_mps', 0):.3f} m/s")
+            self.lbl_velocity_error.setText(f"{getattr(trans, 'velocity_error_percent', 0):.2f} %")
+            self.lbl_total_ratio.setText(f"{getattr(trans, 'total_transmission_ratio', 0):.2f}")
+            self.lbl_required_force.setText(f"{getattr(trans, 'required_force_kN', 0):.2f} kN")
+            self.lbl_allowable_force.setText(f"{getattr(trans, 'allowable_force_kN', 0):.2f} kN")
+            self.lbl_safety_margin.setText(f"{getattr(trans, 'safety_margin', 0):.2f}")
+            self.lbl_chain_weight.setText(f"{getattr(trans, 'chain_weight_kg_per_m', 0):.2f} kg/m")
+            # --- [KẾT THÚC SỬA LỖI] ---
         else:
-            # Hiển thị thông báo nếu không có giải pháp
-            # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
-            self.lbl_gearbox_mode.setText("Chưa xác định")
-            self.lbl_gearbox_ratio_used.setText("Chưa xác định")
-            # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
+            # --- [BẮT ĐẦU SỬA LỖI] ---
+            # Hiển thị thông tin cơ bản ngay cả khi không có transmission_solution
+            motor_rpm = getattr(result, 'motor_rpm', 1450)
+            self.lbl_motor_output_rpm.setText(f"{motor_rpm:.0f} RPM")
+            # --- [KẾT THÚC SỬA LỖI] ---
             
-            self.lbl_motor_output_rpm.setText("Chưa xác định")
-            self.lbl_gearbox_ratio.setText("Chưa xác định")
-            self.lbl_chain_designation.setText("Chưa xác định")
-            self.lbl_drive_sprocket.setText("Chưa xác định")
-            self.lbl_driven_sprocket.setText("Chưa xác định")
-            self.lbl_actual_velocity.setText("Chưa xác định")
-            self.lbl_velocity_error.setText("Chưa xác định")
-            self.lbl_total_ratio.setText("Chưa xác định")
-            
-            # --- [BẮT ĐẦU NÂNG CẤP THEO KẾ HOẠCH] ---
-            # Đặt giá trị mặc định cho các trường mới
-            self.lbl_required_force.setText("Chưa xác định")
-            self.lbl_allowable_force.setText("Chưa xác định")
-            self.lbl_safety_margin.setText("Chưa xác định")
-            self.lbl_chain_weight.setText("Chưa xác định")
-            # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
+            # Clear labels if no transmission solution
+            for label in [
+                self.lbl_gearbox_mode, self.lbl_gearbox_ratio_used,
+                self.lbl_gearbox_ratio, self.lbl_chain_designation, self.lbl_sprocket_teeth,
+                self.lbl_actual_velocity, self.lbl_velocity_error,
+                self.lbl_total_ratio, self.lbl_required_force, self.lbl_allowable_force,
+                self.lbl_safety_margin, self.lbl_chain_weight
+            ]:
+                label.setText("---")
 
-    # --- [BẮT ĐẦU NÂNG CẤP] ---
-    def _update_analysis_tab(self, r):
-        """Tạo báo cáo HTML cho tab Phân tích Kỹ thuật."""
+    def _update_analysis_tab(self, result) -> None:
+        """Cập nhật tab 'Phân tích' với dữ liệu từ kết quả tính toán."""
+        if not result:
+            self.txt_analysis.setHtml("")
+            return
+
+        eff = getattr(result, "drive_efficiency_percent", getattr(result, "efficiency", 0.0))
+        belt_utilization = getattr(result, "belt_strength_utilization", 0.0)
+        capacity_utilization = getattr(result, "capacity_utilization", 0.0)
+        
         ana_report_html = "<h3>PHÂN TÍCH KỸ THUẬT</h3>"
-        eff = getattr(r, "drive_efficiency_percent", getattr(r, "efficiency", 0.0))
         ana_report_html += f"<p><b>- Hiệu suất truyền động:</b> {eff:.1f}% (η_m × η_g ÷ Kt)</p>"
-        ana_report_html += f"<p><b>- Phần trăm sử dụng cường độ đai:</b> {r.belt_strength_utilization:.1f}%</p>"
-        ana_report_html += f"<p><b>- Phần trăm sử dụng tiết diện (ước tính):</b> {r.capacity_utilization:.1f}%</p>"
-
-        # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
-        # Loại bỏ phần hiển thị bộ truyền động hoàn chỉnh vì đã có trong tab Cấu trúc đề xuất
-        # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
-
-        # Logic mới để hiển thị kết quả truyền động kép
-        if r.drive_distribution_method:
-            ana_report_html += "<h4 style='color: #3b82f6;'>PHÂN TÍCH TRUYỀN ĐỘNG KÉP</h4>"
-            ana_report_html += f"<p><b>Phương pháp phân phối:</b> {r.drive_distribution_method}</p>"
-            ana_report_html += "<ul>"
-            ana_report_html += f"<li><b>Puly 1 (Chính):</b> Lực vòng Fp1 = <b>{r.Fp1:,.1f} kgf</b> | Lực căng T1 = <b>{r.F11:,.0f} N</b></li>"
-            ana_report_html += f"<li><b>Puly 2 (Phụ):</b> Lực vòng Fp2 = <b>{r.Fp2:,.1f} kgf</b> | Lực căng T2 = <b>{r.F12:,.0f} N</b></li>"
-            ana_report_html += "</ul>"
-            ana_report_html += f"<p><b>=> Lực căng lớn nhất toàn hệ thống (Max Tension): {r.max_tension:,.0f} N</b></p>"
-
-        if r.warnings:
+        ana_report_html += f"<p><b>- Phần trăm sử dụng cường độ đai:</b> {belt_utilization:.1f}%</p>"
+        ana_report_html += f"<p><b>- Phần trăm sử dụng tiết diện (ước tính):</b> {capacity_utilization:.1f}%</p>"
+        
+        warnings = getattr(result, 'warnings', [])
+        if warnings:
             ana_report_html += "<h4 style='color: #f59e0b;'>CẢNH BÁO:</h4><ul>"
-            for w in r.warnings:
+            for w in warnings:
                 ana_report_html += f"<li>{w}</li>"
             ana_report_html += "</ul>"
-
-        if r.recommendations:
+            
+        recommendations = getattr(result, 'recommendations', [])
+        if recommendations:
             ana_report_html += "<h4 style='color: #22c55e;'>KHUYẾN NGHỊ:</h4><ul>"
-            for rec in r.recommendations:
+            for rec in recommendations:
                 ana_report_html += f"<li>{rec}</li>"
             ana_report_html += "</ul>"
-
+            
         self.txt_analysis.setHtml(ana_report_html)
-    # --- [KẾT THÚC NÂNG CẤP] ---
 
-    def _switch_mode(self, idx: int) -> None:
-        idx = 0 if idx not in (0, 1) else idx
-        self.btn_2d_mode.setChecked(idx == 0)
-        self.btn_3d_mode.setChecked(idx == 1)
-        self.viz_stack.setCurrentIndex(idx)
-        if idx == 1 and HAS_3D_SUPPORT and self._current_params and self._current_result:
-            try:
-                self.viz_3d.update_visualization(self._current_params, self._current_result, theme=self._current_theme)
-            except Exception:
-                pass
+    @Slot(int)
+    def _switch_mode(self, index: int) -> None:
+        """Chuyển đổi giữa chế độ xem 2D và 3D."""
+        self.viz_stack.setCurrentIndex(index)
+        self.btn_2d_mode.setChecked(index == 0)
+        self.btn_3d_mode.setChecked(index == 1)
+

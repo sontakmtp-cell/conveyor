@@ -195,17 +195,31 @@ def _write_results_sheet(writer, result, formats):
             gearbox_info = f"Auto - {t.gearbox_ratio:.1f}"
         # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
         
-        # Hiển thị mã xích với cả tiêu chuẩn ANSI và ISO
+        # Hiển thị mã xích với cả tiêu chuẩn ANSI và ISO theo định dạng rõ ràng
         chain_display = t.chain_designation
         if hasattr(t, 'chain_spec') and t.chain_spec:
             ansi_code = t.chain_spec.ansi_code or ""
             iso_code = t.chain_spec.iso_code or ""
             if ansi_code and iso_code:
-                chain_display = f"{ansi_code} / {iso_code}"
+                # Hiển thị theo định dạng: 25/05B (ANSI/ISO)
+                chain_display = f"{ansi_code}/{iso_code} (ANSI/ISO)"
             elif ansi_code:
                 chain_display = f"{ansi_code} (ANSI)"
             elif iso_code:
                 chain_display = f"{iso_code} (ISO)"
+        elif '/' in chain_display and chain_display.endswith(' (ANSI/ISO)'):
+            # Xử lý format mới: "25/05B (ANSI/ISO)"
+            chain_display = chain_display  # Giữ nguyên format
+        elif '/' in chain_display:
+            # Nếu chain_designation có dạng "25/05B", hiển thị rõ ràng
+            ansi_part, iso_part = chain_display.split('/', 1)
+            chain_display = f"{ansi_part}/{iso_part} (ANSI/ISO)"
+        elif chain_display.endswith(' (ANSI)'):
+            # Xử lý format mới: "25 (ANSI)"
+            chain_display = chain_display  # Giữ nguyên format
+        elif chain_display.endswith(' (ISO)'):
+            # Xử lý format mới: "05B (ISO)"
+            chain_display = chain_display  # Giữ nguyên format
         
         result_groups["Bộ truyền động hoàn chỉnh"] = {
             "Chế độ hộp số": gearbox_info,
@@ -298,17 +312,30 @@ def _write_structural_sheet(writer, result, formats):
             gearbox_info = f"Tự động tính toán - {result.transmission_solution.gearbox_ratio:.1f}"
         # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
         
-        # Hiển thị mã xích với cả tiêu chuẩn ANSI và ISO
+        # Hiển thị mã xích với cả tiêu chuẩn ANSI và ISO theo định dạng rõ ràng
         chain_display = result.transmission_solution.chain_designation
         if hasattr(result.transmission_solution, 'chain_spec') and result.transmission_solution.chain_spec:
             ansi_code = result.transmission_solution.chain_spec.ansi_code or ""
             iso_code = result.transmission_solution.chain_spec.iso_code or ""
             if ansi_code and iso_code:
-                chain_display = f"{ansi_code} / {iso_code}"
+                chain_display = f"{ansi_code}/{iso_code} (ANSI/ISO)"
             elif ansi_code:
                 chain_display = f"{ansi_code} (ANSI)"
             elif iso_code:
                 chain_display = f"{iso_code} (ISO)"
+        elif '/' in chain_display and chain_display.endswith(' (ANSI/ISO)'):
+            # Xử lý format mới: "25/05B (ANSI/ISO)"
+            chain_display = chain_display  # Giữ nguyên format
+        elif '/' in chain_display:
+            # Nếu chain_designation có dạng "25/05B", hiển thị rõ ràng
+            ansi_part, iso_part = chain_display.split('/', 1)
+            chain_display = f"{ansi_part}/{iso_part} (ANSI/ISO)"
+        elif chain_display.endswith(' (ANSI)'):
+            # Xử lý format mới: "25 (ANSI)"
+            chain_display = chain_display  # Giữ nguyên format
+        elif chain_display.endswith(' (ISO)'):
+            # Xử lý format mới: "05B (ISO)"
+            chain_display = chain_display  # Giữ nguyên format
         
         # Tính toán tốc độ đầu ra động cơ
         motor_rpm = getattr(result, 'motor_rpm', 1450)

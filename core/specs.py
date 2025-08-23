@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 from typing import List
-from .models import MaterialType, BeltType
+try:
+    from .models import MaterialType, BeltType
+except ImportError:
+    # Fallback cho trường hợp chạy trực tiếp
+    from models import MaterialType, BeltType
 G = 9.81
-VERSION = "2.1 Professional (Refactored)"
+VERSION = "3.5 Professional (Enhanced Chain Support)"
 COPYRIGHT = "Mọi thắc mắc và góp ý xin gửi về haingocson@gmail.com"
 
 STANDARD_WIDTHS = [300, 400, 450, 500, 600, 650, 750, 800, 900, 1000, 1050, 1200, 1400, 1600, 1800, 2000, 2200]
@@ -89,14 +93,18 @@ def load_chain_data() -> List['ChainSpec']:
         with open(csv_path, 'r', encoding='utf-8') as file:
             reader = csv.DictReader(file)
             for row in reader:
-                # Bỏ qua các hàng trống hoặc không có mã xích
-                if not row.get('ANSI Standard Chain Code') or row['ANSI Standard Chain Code'].strip() == '':
+                # Kiểm tra có ít nhất một trong hai mã xích (ANSI hoặc ISO)
+                ansi_code = (row.get('ANSI Standard Chain Code') or '').strip()
+                iso_code = (row.get('ISO Standard Chain Code') or '').strip()
+                
+                # Bỏ qua các hàng trống hoặc không có mã xích nào
+                if not ansi_code and not iso_code:
                     continue
                 
                 # Xử lý dữ liệu từ file CSV (dùng dữ liệu thực, không ước lượng)
                 try:
                     pitch_mm = float(row['Pitch P (mm)'].replace(',', '.'))
-                    weight_kgpm = float(row['Weight\nkg/m'].replace(',', '.'))
+                    weight_kgpm = float(row['Weight kg/m'].replace(',', '.'))
                     iso_code = (row.get('ISO Standard Chain Code') or '').strip()
                     ansi_code = (row.get('ANSI Standard Chain Code') or '').strip()
                     strand_txt = (row.get('Strand') or '1R').strip().upper()
@@ -110,8 +118,16 @@ def load_chain_data() -> List['ChainSpec']:
                     measuring_load_min_kn = measuring_load_min_n / 1000.0
                     # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
 
+                    # Tạo designation kết hợp cả ANSI và ISO nếu có
+                    if ansi_code and iso_code:
+                        designation = f"{ansi_code}/{iso_code} (ANSI/ISO)"
+                    elif ansi_code:
+                        designation = f"{ansi_code} (ANSI)"
+                    else:
+                        designation = f"{iso_code} (ISO)"
+
                     chain_spec = ChainSpec(
-                        designation=ansi_code or iso_code,
+                        designation=designation,
                         iso_code=iso_code,
                         ansi_code=ansi_code,
                         strand=strand,
@@ -146,4 +162,5 @@ def load_chain_data() -> List['ChainSpec']:
 
 # Danh sách xích đã tải (cache)
 ACTIVE_CHAIN_SPECS = load_chain_data()
+
 # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---

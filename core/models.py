@@ -106,6 +106,7 @@ class CalculationResult:
     Qt_effective_tph: float = 0.0
     Qt_calc_tph: float = 0.0
     cross_section_area_m2: float = 0.0
+    total_mass_kg: float = 0.0
 
     material_load_kgpm: float = 0.0
     belt_weight_kgpm: float = 0.0
@@ -182,6 +183,11 @@ class CalculationResult:
     gearbox_ratio_mode: str = "auto"  # Chế độ đã sử dụng: "auto" | "manual"
     gearbox_ratio_user: float = 0.0   # Tỉ số hộp số do người dùng nhập (nếu manual)
     # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
+    
+    # --- [BẮT ĐẦU SỬA LỖI UI] ---
+    # Tốc độ động cơ (vòng/phút) - cần thiết để UI hiển thị
+    motor_rpm: int = 1450
+    # --- [KẾT THÚC SỬA LỖI UI] ---
 
 # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
 # Model cho thông số xích
@@ -224,5 +230,16 @@ class TransmissionSolution:
     safety_margin: float = 0.0      # Hệ số an toàn (allowable/required)
     chain_weight_kgpm: float = 0.0  # Trọng lượng xích (kg/m)
     # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
+    
+    # --- [BẮT ĐẦU SỬA LỖI UI] ---
+    # Các thuộc tính bổ sung để UI có thể truy cập đúng
+    gearbox_ratio_mode: str = "auto"  # Chế độ hộp số (auto/manual)
+    motor_output_rpm: float = 0.0     # Tốc độ đầu ra động cơ (RPM)
+    actual_velocity_mps: float = 0.0  # Vận tốc băng tải thực tế (m/s) - alias cho actual_belt_velocity
+    velocity_error_percent: float = 0.0  # Sai số vận tốc (%) - alias cho error
+    required_force_kN: float = 0.0    # Lực kéo yêu cầu (kN) - alias
+    allowable_force_kN: float = 0.0   # Lực kéo cho phép (kN) - alias
+    chain_weight_kg_per_m: float = 0.0  # Trọng lượng xích (kg/m) - alias
+    # --- [KẾT THÚC SỬA LỖI UI] ---
 # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
 

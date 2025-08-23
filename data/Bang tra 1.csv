@@ -1,5 +1,4 @@
-ISO Standard Chain Code,ANSI Standard Chain Code,Strand,Pitch P (mm),Inner Width W (mm),Roller Diameter D (mm),Pin Diameter d (mm),Pin Length L1 (mm),Connecting Link Pin Length L2 (mm),Plate Thickness T (mm),Center Distance for Double Strand C (mm),"Weight
-kg/m",Tensile Strength (min kN),Measuring Load (min N)
+ISO Standard Chain Code,ANSI Standard Chain Code,Strand,Pitch P (mm),Inner Width W (mm),Roller Diameter D (mm),Pin Diameter d (mm),Pin Length L1 (mm),Connecting Link Pin Length L2 (mm),Plate Thickness T (mm),Center Distance for Double Strand C (mm),Weight kg/m,Tensile Strength (min kN),Measuring Load (min N)
 05B,25,1R,6.35,3.18,3.3,2.29,8.64,9.4,0.76,0,0.13,4.1,50
 05B,25,2R,6.35,3.18,3.3,2.29,14.99,16,0.76,6.4,0.24,7.8,100
 05B,25,3R,6.35,3.18,3.3,2.29,21.34,22.35,0.76,6.4,0.37,11.1,150
