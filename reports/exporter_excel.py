@@ -195,11 +195,23 @@ def _write_results_sheet(writer, result, formats):
             gearbox_info = f"Auto - {t.gearbox_ratio:.1f}"
         # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
         
+        # Hiển thị mã xích với cả tiêu chuẩn ANSI và ISO
+        chain_display = t.chain_designation
+        if hasattr(t, 'chain_spec') and t.chain_spec:
+            ansi_code = t.chain_spec.ansi_code or ""
+            iso_code = t.chain_spec.iso_code or ""
+            if ansi_code and iso_code:
+                chain_display = f"{ansi_code} / {iso_code}"
+            elif ansi_code:
+                chain_display = f"{ansi_code} (ANSI)"
+            elif iso_code:
+                chain_display = f"{iso_code} (ISO)"
+        
         result_groups["Bộ truyền động hoàn chỉnh"] = {
             "Chế độ hộp số": gearbox_info,
             "Nhông dẫn (số răng)": t.drive_sprocket_teeth,
             "Nhông bị dẫn (số răng)": t.driven_sprocket_teeth,
-            "Xích (mã)": t.chain_designation,
+            "Mã xích (ANSI/ISO)": chain_display,
             "Bước xích (mm)": t.chain_pitch_mm,
             "Tổng tỉ số truyền": t.total_transmission_ratio,
             "Vận tốc thực tế (m/s)": t.actual_belt_velocity,
@@ -280,15 +292,32 @@ def _write_structural_sheet(writer, result, formats):
         # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
         # Thông tin về chế độ hộp số
         if hasattr(result, 'gearbox_ratio_mode'):
-            mode_text = "Manual" if result.gearbox_ratio_mode.lower() == "manual" else "Auto"
+            mode_text = "Chỉ định" if result.gearbox_ratio_mode.lower() == "manual" else "Tự động tính toán"
             gearbox_info = f"{mode_text} - {result.transmission_solution.gearbox_ratio:.1f}"
         else:
-            gearbox_info = f"Auto - {result.transmission_solution.gearbox_ratio:.1f}"
+            gearbox_info = f"Tự động tính toán - {result.transmission_solution.gearbox_ratio:.1f}"
         # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
+        
+        # Hiển thị mã xích với cả tiêu chuẩn ANSI và ISO
+        chain_display = result.transmission_solution.chain_designation
+        if hasattr(result.transmission_solution, 'chain_spec') and result.transmission_solution.chain_spec:
+            ansi_code = result.transmission_solution.chain_spec.ansi_code or ""
+            iso_code = result.transmission_solution.chain_spec.iso_code or ""
+            if ansi_code and iso_code:
+                chain_display = f"{ansi_code} / {iso_code}"
+            elif ansi_code:
+                chain_display = f"{ansi_code} (ANSI)"
+            elif iso_code:
+                chain_display = f"{iso_code} (ISO)"
+        
+        # Tính toán tốc độ đầu ra động cơ
+        motor_rpm = getattr(result, 'motor_rpm', 1450)
+        output_rpm = motor_rpm / result.transmission_solution.gearbox_ratio
         
         transmission_data = {
             "Chế độ hộp số": gearbox_info,
-            "Mã xích": result.transmission_solution.chain_designation,
+            "Tốc độ đầu ra động cơ (rpm)": output_rpm,
+            "Mã xích (ANSI/ISO)": chain_display,
             "Số răng nhông dẫn": result.transmission_solution.drive_sprocket_teeth,
             "Số răng nhông bị dẫn": result.transmission_solution.driven_sprocket_teeth,
             "Bước xích (mm)": result.transmission_solution.chain_pitch_mm,

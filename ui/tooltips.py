@@ -64,7 +64,7 @@ HTML = {
     ),
     "spn_surcharge": (
         "<b>Góc chất tải (°)</b><br>"
-        "Độ nhọn/bè của đống vật liệu trên băng. Phụ thuộc vào vật liệu (góc nghỉ tự nhiên). "
+        "Độ nhọn/bè của đống vật liệu trên băng. <b>Luôn bằng góc nghiêng tự nhiên</b> của vật liệu. "
         "Góc lớn thì chở nhiều hơn nhưng dễ văng rơi nếu chạy nhanh. "
         "Thường 20°–30° cho vật liệu chảy tốt; 30°–35° cho vật liệu góc nghỉ lớn."
     ),
@@ -90,17 +90,17 @@ HTML = {
     "gearbox_ratio_mode_select": (
         "<b>Chế độ hộp số</b><br>"
         "Chọn cách xác định tỉ số truyền của hộp số giảm tốc.<br><br>"
-        "<u>Auto:</u><br>"
+        "<u>Tự động tính toán:</u><br>"
         "• Phần mềm tự động chọn từ danh sách tỉ số chuẩn (5, 8, 10, 12.5, 15, 20, 25, 30...)<br>"
         "• Tối ưu đa mục tiêu: sai số vận tốc → tổng răng nhỏ → i_s gần 1.9 → pitch nhỏ/nhẹ<br><br>"
-        "<u>Manual:</u><br>"
+        "<u>Chỉ định:</u><br>"
         "• Người dùng nhập tỉ số cụ thể (ví dụ: 12.5)<br>"
         "• Thuật toán sẽ tính và chọn nhông-xích dựa trên i_g này<br>"
         "• Nếu i_s_target ngoài dải [1.2, 3.0], sẽ clamp về giới hạn gần nhất"
     ),
     "gearbox_ratio_input": (
         "<b>Tỉ số hộp số</b><br>"
-        "Nhập tỉ số truyền của hộp số giảm tốc khi chọn chế độ Manual.<br><br>"
+        "Nhập tỉ số truyền của hộp số giảm tốc khi chọn chế độ Chỉ định.<br><br>"
         "<u>Giá trị hợp lý:</u><br>"
         "• Thường từ 5 đến 100<br>"
         "• Tỉ số cao = giảm tốc nhiều = motor quay nhanh, puly quay chậm<br>"

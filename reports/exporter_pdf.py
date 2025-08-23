@@ -311,10 +311,22 @@ class ProfessionalPDFExporter(FPDF):
             self.ln(2)
             
             t = r.transmission_solution
+            # Hiển thị mã xích với cả tiêu chuẩn ANSI và ISO
+            chain_display = t.chain_designation
+            if hasattr(t, 'chain_spec') and t.chain_spec:
+                ansi_code = t.chain_spec.ansi_code or ""
+                iso_code = t.chain_spec.iso_code or ""
+                if ansi_code and iso_code:
+                    chain_display = f"{ansi_code} / {iso_code}"
+                elif ansi_code:
+                    chain_display = f"{ansi_code} (ANSI)"
+                elif iso_code:
+                    chain_display = f"{iso_code} (ISO)"
+            
             transmission_data = {
                 "Hộp số giảm tốc (tỉ số truyền)": f"{t.gearbox_ratio}",
                 "Bộ truyền nhông-xích": f"{t.drive_sprocket_teeth} răng → {t.driven_sprocket_teeth} răng",
-                "Xích (bước)": f"{t.chain_designation} ({t.chain_pitch_mm} mm)",
+                "Mã xích (ANSI/ISO)": f"{chain_display} ({t.chain_pitch_mm} mm)",
                 "Tổng tỉ số truyền": f"{t.total_transmission_ratio:.2f}",
                 "Vận tốc thực tế": f"{t.actual_belt_velocity:.3f} m/s",
                 "Sai số so với yêu cầu": f"{t.error:.2f}%",
@@ -431,15 +443,32 @@ class ProfessionalPDFExporter(FPDF):
             # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
             # Thông tin về chế độ hộp số
             if hasattr(r, 'gearbox_ratio_mode'):
-                mode_text = "Manual" if r.gearbox_ratio_mode.lower() == "manual" else "Auto"
+                mode_text = "Chỉ định" if r.gearbox_ratio_mode.lower() == "manual" else "Tự động tính toán"
                 gearbox_info = f"{mode_text} - {r.transmission_solution.gearbox_ratio:.1f}"
             else:
-                gearbox_info = f"Auto - {r.transmission_solution.gearbox_ratio:.1f}"
+                gearbox_info = f"Tự động tính toán - {r.transmission_solution.gearbox_ratio:.1f}"
             # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
+            
+            # Hiển thị mã xích với cả tiêu chuẩn ANSI và ISO
+            chain_display = r.transmission_solution.chain_designation
+            if hasattr(r.transmission_solution, 'chain_spec') and r.transmission_solution.chain_spec:
+                ansi_code = r.transmission_solution.chain_spec.ansi_code or ""
+                iso_code = r.transmission_solution.chain_spec.iso_code or ""
+                if ansi_code and iso_code:
+                    chain_display = f"{ansi_code} / {iso_code}"
+                elif ansi_code:
+                    chain_display = f"{ansi_code} (ANSI)"
+                elif iso_code:
+                    chain_display = f"{iso_code} (ISO)"
+            
+            # Tính toán tốc độ đầu ra động cơ
+            motor_rpm = getattr(r, 'motor_rpm', 1450)
+            output_rpm = motor_rpm / r.transmission_solution.gearbox_ratio
             
             transmission_data = {
                 "Chế độ hộp số": gearbox_info,
-                "Mã xích": r.transmission_solution.chain_designation,
+                "Tốc độ đầu ra động cơ": f"{output_rpm:.0f} rpm",
+                "Mã xích (ANSI/ISO)": chain_display,
                 "Số răng nhông dẫn": f"{r.transmission_solution.drive_sprocket_teeth}",
                 "Số răng nhông bị dẫn": f"{r.transmission_solution.driven_sprocket_teeth}",
                 "Bước xích": f"{r.transmission_solution.chain_pitch_mm:.1f} mm",

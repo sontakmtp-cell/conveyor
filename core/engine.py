@@ -230,38 +230,47 @@ class CalculationStrategy(ABC):
 
     def _apply_geo_limitation_to_load(self):
         V = max(0.05, float(self.p.V_mps))
+        
+        # SỬA LỖI: Tính q_from_Qt dựa trên lưu lượng yêu cầu và khối lượng riêng
+        # q_from_Qt = (Qt_tph * 1000 kg/t) / (3600 s/h * V m/s) = kg/m
+        # Nhưng Qt_tph phải được điều chỉnh theo khối lượng riêng để duy trì cùng một tải trọng vật liệu
+        # Khi khối lượng riêng thay đổi, tải trọng vật liệu trên băng tải phải thay đổi
         q_from_Qt = (self.p.Qt_tph * 1000.0 / 3600.0) / V
+        
+        # Tính q_from_geo: tải trọng vật liệu từ tiết diện và khối lượng riêng
+        # q_from_geo = A m² * 1000 kg/m³ = kg/m
         q_from_geo = float(self.r.cross_section_area_m2) * 1000.0 * float(self.p.density_tpm3)
+        
+        # Lấy giá trị nhỏ hơn để đảm bảo không vượt quá khả năng tiết diện
         q_eff = min(q_from_Qt, q_from_geo)
         
         # Debug: in ra các giá trị để kiểm tra
-        print(f"DEBUG: V={V}, q_from_Qt={q_from_Qt}, q_from_geo={q_from_geo}")
-        print(f"DEBUG: density_tpm3={self.p.density_tpm3}, cross_section_area_m2={self.r.cross_section_area_m2}")
-        print(f"DEBUG: q_eff={q_eff}")
-        print(f"DEBUG: BEFORE - material_load_kgpm={self.r.material_load_kgpm}")
+        print(f"DEBUG: V={V}, q_from_Qt={q_from_Qt:.3f}, q_from_geo={q_from_geo:.3f}")
+        print(f"DEBUG: density_tpm3={self.p.density_tpm3}, cross_section_area_m2={self.r.cross_section_area_m2:.6f}")
+        print(f"DEBUG: q_eff={q_eff:.3f}")
+        print(f"DEBUG: BEFORE - material_load_kgpm={self.r.material_load_kgpm:.3f}")
         
-        # LUÔN cập nhật material_load_kgpm dựa trên khối lượng riêng vật liệu mới
-        # Đây là sửa đổi quan trọng để đảm bảo công suất động cơ thay đổi khi thay đổi vật liệu
+        # SỬA LỖI: material_load_kgpm được tính dựa trên q_from_Qt để đảm bảo công suất động cơ thay đổi khi thay đổi vật liệu
+        # Khi khối lượng riêng thay đổi, tải trọng vật liệu trên băng tải phải thay đổi để duy trì cùng một lưu lượng
+        self.r.material_load_kgpm = q_from_Qt
+        
+        # Kiểm tra xem có bị khống chế bởi tiết diện không
         if q_eff < q_from_Qt - 1e-6:
             # Bị khống chế bởi tiết diện
-            self.r.material_load_kgpm = q_eff
             self.r.warnings.append(
                 f"Lưu lượng thực bị khống chế bởi tiết diện: Q_thực≈{q_eff * V * 3.6 / 1000.0:.1f} t/h < Q_yêu cầu={self.p.Qt_tph:.1f} t/h."
             )
-            print(f"DEBUG: UPDATED material_load_kgpm to {q_eff} due to geometric limitation")
+            print(f"DEBUG: WARNING: Geometric limitation detected, but material_load_kgpm still set to {q_from_Qt:.3f}")
         else:
-            # Không bị khống chế bởi tiết diện, nhưng vẫn cập nhật dựa trên khối lượng riêng mới
-            # Tính lại material_load_kgpm từ lưu lượng yêu cầu và khối lượng riêng
-            self.r.material_load_kgpm = q_from_Qt
-            print(f"DEBUG: UPDATED material_load_kgpm to {q_from_Qt} based on new material density")
+            print(f"DEBUG: No geometric limitation, material_load_kgpm set to {q_from_Qt:.3f}")
         
         # Luôn cập nhật total_load_kgpm và mass_flow_rate
         self.r.total_load_kgpm = self.r.material_load_kgpm + self.r.belt_weight_kgpm + self.r.moving_parts_weight_kgpm
         self.r.mass_flow_rate = self.r.material_load_kgpm * V
         self.r.Qt_effective_tph = self.r.mass_flow_rate * 3.6 / 1000.0
         
-        print(f"DEBUG: AFTER - material_load_kgpm={self.r.material_load_kgpm}, total_load_kgpm={self.r.total_load_kgpm}")
-        print(f"DEBUG: mass_flow_rate={self.r.mass_flow_rate}, Qt_effective_tph={self.r.Qt_effective_tph}")
+        print(f"DEBUG: AFTER - material_load_kgpm={self.r.material_load_kgpm:.3f}, total_load_kgpm={self.r.total_load_kgpm:.3f}")
+        print(f"DEBUG: mass_flow_rate={self.r.mass_flow_rate:.3f}, Qt_effective_tph={self.r.Qt_effective_tph:.3f}")
 
     # --- [BẮT ĐẦU NÂNG CẤP] ---
     def _calculate_single_drive_tensions(self):
@@ -694,6 +703,9 @@ def calculate(p: ConveyorParameters) -> CalculationResult:
     result = strat.execute()
     
     # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
+    # Lưu motor_rpm vào kết quả để UI hiển thị chính xác
+    result.motor_rpm = p.motor_rpm
+    
     # Tính toán bộ truyền động hoàn chỉnh
     try:
         from .specs import ACTIVE_CHAIN_SPECS

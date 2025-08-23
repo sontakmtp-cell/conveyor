@@ -208,8 +208,8 @@ class InputsPanel(QWidget):
         # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
         # Chế độ chọn tỉ số hộp số
         self.cbo_gearbox_ratio_mode = QComboBox()
-        self.cbo_gearbox_ratio_mode.addItems(["Auto", "Manual"])
-        self.cbo_gearbox_ratio_mode.setCurrentText("Auto")
+        self.cbo_gearbox_ratio_mode.addItems(["Tự động tính toán", "Chỉ định"])
+        self.cbo_gearbox_ratio_mode.setCurrentText("Tự động tính toán")
         self.cbo_gearbox_ratio_mode.setObjectName("gearbox_ratio_mode_select")
         
         # Tỉ số hộp số do người dùng nhập
@@ -258,6 +258,12 @@ class InputsPanel(QWidget):
         g = QGroupBox("Lựa chọn vật liệu & đặc tính")
         f = QFormLayout(g)
         f.addRow("Loại vật liệu:", self.cbo_material)
+        
+        # Thêm label hiển thị thông tin vật liệu
+        self.lbl_material_info = QLabel("Chọn vật liệu để xem thông tin")
+        self.lbl_material_info.setStyleSheet("color: #666; font-style: italic; padding: 5px;")
+        f.addRow("Thông tin:", self.lbl_material_info)
+        
         f.addRow("Khối lượng riêng:", self.spn_density)
         f.addRow("Kích thước hạt:", self.spn_particle)
         f.addRow("Góc nghiêng tự nhiên:", self.spn_angle)
@@ -293,7 +299,7 @@ class InputsPanel(QWidget):
         f.addRow("Loại băng:", self.cbo_belt_type)
         f.addRow("Độ dày băng:", self.spn_thickness)
         f.addRow("Góc máng:", self.cbo_trough)
-        f.addRow("Góc chất tải:", self.spn_surcharge)
+        # f.addRow("Góc chất tải:", self.spn_surcharge)  # Ẩn góc chất tải - luôn bằng góc nghiêng tự nhiên
         f.addRow("KC con lăn tải:", self.spn_carrying)
         f.addRow("KC con lăn về:", self.spn_return)
 
@@ -306,22 +312,26 @@ class InputsPanel(QWidget):
         else:
             self.img_trough.setText("Hình góc máng đang cập nhật")
 
-        self.img_surcharge = QLabel()
-        self.img_surcharge.setObjectName("imgSurcharge")
-        self.img_surcharge.setToolTip("Minh họa góc chất tải (surcharge).")
-        p_surcharge = QPixmap(self._img_path("surcharge_angle.png"))
-        if not p_surcharge.isNull():
-            self.img_surcharge.setPixmap(p_surcharge.scaledToHeight(120, Qt.SmoothTransformation))
-        else:
-            self.img_surcharge.setText("Hình góc chất tải đang cập nhật")
+        # Ẩn hình minh họa góc chất tải
+        # self.img_surcharge = QLabel()
+        # self.img_surcharge.setObjectName("imgSurcharge")
+        # self.img_surcharge.setToolTip("Minh họa góc chất tải (surcharge).")
+        # p_surcharge = QPixmap(self._img_path("surcharge_angle.png"))
+        # if not p_surcharge.isNull():
+        #     self.img_surcharge.setPixmap(p_surcharge.scaledToHeight(120, Qt.SmoothTransformation))
+        # else:
+        #     self.img_surcharge.setText("Hình góc chất tải đang cập nhật")
 
-        img_row = QHBoxLayout()
-        img_row.addWidget(self.img_trough, 1)
-        img_row.addWidget(self.img_surcharge, 1)
+        # img_row = QHBoxLayout()
+        # img_row.addWidget(self.img_trough, 1)
+        # img_row.addWidget(self.img_surcharge, 1)
 
-        img_wrap = QWidget()
-        img_wrap.setLayout(img_row)
-        f.addRow("Minh họa:", img_wrap)
+        # img_wrap = QWidget()
+        # img_wrap.setLayout(img_row)
+        # f.addRow("Minh họa:", img_wrap)
+
+        # Chỉ hiển thị hình góc máng
+        f.addRow("Minh họa:", self.img_trough)
 
         return g
 
@@ -391,7 +401,7 @@ class InputsPanel(QWidget):
     @Slot(str)
     def _on_gearbox_mode_changed(self, mode_text: str) -> None:
         """Xử lý sự kiện thay đổi chế độ hộp số"""
-        is_manual = mode_text.strip().lower() == "manual"
+        is_manual = mode_text.strip().lower() == "chỉ định"
         self.spn_gearbox_ratio_user.setEnabled(is_manual)
         
         # Nếu chuyển về Auto, reset giá trị về 0
@@ -458,7 +468,7 @@ class Enhanced3DResultsPanel(QWidget):
         l_pulleys = QVBoxLayout(g_pulleys)
         self.tbl_pulleys = QTableWidget()
         self.tbl_pulleys.setColumnCount(2)
-        self.tbl_pulleys.setHorizontalHeaderLabels(["Loại Puly (theo Bảng 21)", "Đường kính đề xuất (mm)"])
+        self.tbl_pulleys.setHorizontalHeaderLabels(["Loại Puly", "Đường kính đề xuất (mm)"])
         self.tbl_pulleys.horizontalHeader().setStretchLastSection(True)
         l_pulleys.addWidget(self.tbl_pulleys)
         g_idlers = QGroupBox("Đề xuất Con lăn & Khoảng cách")
@@ -482,6 +492,9 @@ class Enhanced3DResultsPanel(QWidget):
         self.lbl_gearbox_ratio_used = QLabel("---"); self.lbl_gearbox_ratio_used.setFont(QFont("Segoe UI", 11, QFont.Bold))
         # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
         
+        # Label cho tốc độ đầu ra động cơ
+        self.lbl_motor_output_rpm = QLabel("---"); self.lbl_motor_output_rpm.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        
         self.lbl_gearbox_ratio = QLabel("---"); self.lbl_gearbox_ratio.setFont(QFont("Segoe UI", 11, QFont.Bold))
         self.lbl_chain_designation = QLabel("---"); self.lbl_chain_designation.setFont(QFont("Segoe UI", 11, QFont.Bold))
         self.lbl_drive_sprocket = QLabel("---"); self.lbl_drive_sprocket.setFont(QFont("Segoe UI", 11, QFont.Bold))
@@ -498,18 +511,12 @@ class Enhanced3DResultsPanel(QWidget):
         self.lbl_chain_weight = QLabel("---"); self.lbl_chain_weight.setFont(QFont("Segoe UI", 11, QFont.Bold))
         # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
         
-        # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
-        f_transmission.addRow("Chế độ hộp số:", self.lbl_gearbox_mode)
-        f_transmission.addRow("i_g sử dụng:", self.lbl_gearbox_ratio_used)
-        # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
-        
-        f_transmission.addRow("Tỉ số truyền hộp số:", self.lbl_gearbox_ratio)
-        f_transmission.addRow("Mã xích:", self.lbl_chain_designation)
+        f_transmission.addRow("Tốc độ đầu ra động cơ:", self.lbl_motor_output_rpm)
+        f_transmission.addRow("Mã xích (ANSI/ISO):", self.lbl_chain_designation)
         f_transmission.addRow("Số răng nhông dẫn:", self.lbl_drive_sprocket)
         f_transmission.addRow("Số răng nhông bị dẫn:", self.lbl_driven_sprocket)
-        f_transmission.addRow("Vận tốc thực tế (m/s):", self.lbl_actual_velocity)
+        f_transmission.addRow("Vận tốc băng tải (m/s):", self.lbl_actual_velocity)
         f_transmission.addRow("Sai số vận tốc (%):", self.lbl_velocity_error)
-        f_transmission.addRow("Tổng tỉ số truyền:", self.lbl_total_ratio)
         
         # --- [BẮT ĐẦU NÂNG CẤP THEO KẾ HOẠCH] ---
         # Thêm các trường mới vào form
@@ -521,7 +528,7 @@ class Enhanced3DResultsPanel(QWidget):
         
         l_struct.addWidget(g_transmission)
         l_struct.addStretch(1)
-        self.tabs.addTab(w_struct, "🏗️ Cấu trúc (Puly & Con lăn)")
+        self.tabs.addTab(w_struct, "🏗️ Cấu trúc đề xuất")
 
         # Tab Phân tích
         w_ana = QWidget(); la = QVBoxLayout(w_ana)
@@ -639,28 +646,54 @@ class Enhanced3DResultsPanel(QWidget):
             # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
             # Hiển thị thông tin về chế độ hộp số
             if hasattr(r, 'gearbox_ratio_mode'):
-                mode_text = "Manual" if r.gearbox_ratio_mode.lower() == "manual" else "Auto"
+                mode_text = "Chỉ định" if r.gearbox_ratio_mode.lower() == "manual" else "Tự động tính toán"
                 self.lbl_gearbox_mode.setText(mode_text)
                 self.lbl_gearbox_ratio_used.setText(f"{t.gearbox_ratio:.1f}")
             else:
-                self.lbl_gearbox_mode.setText("Auto")
+                self.lbl_gearbox_mode.setText("Tự động tính toán")
                 self.lbl_gearbox_ratio_used.setText(f"{t.gearbox_ratio:.1f}")
             # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
             
-            self.lbl_gearbox_ratio.setText(f"{t.gearbox_ratio}")
-            self.lbl_chain_designation.setText(t.chain_designation)
-            self.lbl_drive_sprocket.setText(f"{t.drive_sprocket_teeth}")
-            self.lbl_driven_sprocket.setText(f"{t.driven_sprocket_teeth}")
-            self.lbl_actual_velocity.setText(f"{t.actual_belt_velocity:.3f}")
-            self.lbl_velocity_error.setText(f"{t.error:.2f}")
+            # Debug: In ra thông tin về hộp số để kiểm tra
+            print(f"DEBUG UI: gearbox_mode={getattr(r, 'gearbox_ratio_mode', 'N/A')}, gearbox_ratio_user={getattr(r, 'gearbox_ratio_user', 'N/A')}")
+            print(f"DEBUG UI: transmission_solution.gearbox_ratio={t.gearbox_ratio}")
+            
+            # Tính toán và hiển thị tốc độ đầu ra động cơ
+            motor_rpm = getattr(r, 'motor_rpm', 1450)  # Lấy tốc độ động cơ từ kết quả
+            output_rpm = motor_rpm / t.gearbox_ratio
+            
+            # Debug: In ra các giá trị để kiểm tra
+            print(f"DEBUG UI: motor_rpm={motor_rpm}, gearbox_ratio={t.gearbox_ratio}, output_rpm={output_rpm:.2f}")
+            
+            self.lbl_motor_output_rpm.setText(f"{output_rpm:.0f} rpm")
+            
+            self.lbl_gearbox_ratio.setText(f"{t.gearbox_ratio:.1f}")
+            # Hiển thị mã xích với cả tiêu chuẩn ANSI và ISO
+            if hasattr(t, 'chain_spec') and t.chain_spec:
+                ansi_code = t.chain_spec.ansi_code or ""
+                iso_code = t.chain_spec.iso_code or ""
+                if ansi_code and iso_code:
+                    self.lbl_chain_designation.setText(f"{ansi_code} / {iso_code}")
+                elif ansi_code:
+                    self.lbl_chain_designation.setText(f"{ansi_code} (ANSI)")
+                elif iso_code:
+                    self.lbl_chain_designation.setText(f"{iso_code} (ISO)")
+                else:
+                    self.lbl_chain_designation.setText(t.chain_designation)
+            else:
+                self.lbl_chain_designation.setText(t.chain_designation)
+            self.lbl_drive_sprocket.setText(f"{t.drive_sprocket_teeth} răng")
+            self.lbl_driven_sprocket.setText(f"{t.driven_sprocket_teeth} răng")
+            self.lbl_actual_velocity.setText(f"{t.actual_belt_velocity:.3f} m/s")
+            self.lbl_velocity_error.setText(f"{t.error:.2f}%")
             self.lbl_total_ratio.setText(f"{t.total_transmission_ratio:.2f}")
             
             # --- [BẮT ĐẦU NÂNG CẤP THEO KẾ HOẠCH] ---
             # Cập nhật các trường mới theo kế hoạch Plan C
-            self.lbl_required_force.setText(f"{t.required_force_kN:.2f}")
-            self.lbl_allowable_force.setText(f"{t.allowable_kN:.2f}")
+            self.lbl_required_force.setText(f"{t.required_force_kN:.2f} kN")
+            self.lbl_allowable_force.setText(f"{t.allowable_kN:.2f} kN")
             self.lbl_safety_margin.setText(f"{t.safety_margin:.2f}")
-            self.lbl_chain_weight.setText(f"{t.chain_weight_kgpm:.3f}")
+            self.lbl_chain_weight.setText(f"{t.chain_weight_kgpm:.3f} kg/m")
             # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
         else:
             # Hiển thị thông báo nếu không có giải pháp
@@ -669,6 +702,7 @@ class Enhanced3DResultsPanel(QWidget):
             self.lbl_gearbox_ratio_used.setText("Chưa xác định")
             # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
             
+            self.lbl_motor_output_rpm.setText("Chưa xác định")
             self.lbl_gearbox_ratio.setText("Chưa xác định")
             self.lbl_chain_designation.setText("Chưa xác định")
             self.lbl_drive_sprocket.setText("Chưa xác định")
@@ -695,38 +729,7 @@ class Enhanced3DResultsPanel(QWidget):
         ana_report_html += f"<p><b>- Phần trăm sử dụng tiết diện (ước tính):</b> {r.capacity_utilization:.1f}%</p>"
 
         # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
-        # Hiển thị kết quả bộ truyền động hoàn chỉnh
-        if hasattr(r, 'transmission_solution') and r.transmission_solution:
-            ana_report_html += "<h4 style='color: #3b82f6;'>BỘ TRUYỀN ĐỘNG HOÀN CHỈNH</h4>"
-            t = r.transmission_solution
-            
-            # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
-            # Hiển thị thông tin về chế độ hộp số
-            if hasattr(r, 'gearbox_ratio_mode'):
-                mode_text = "Manual" if r.gearbox_ratio_mode.lower() == "manual" else "Auto"
-                ana_report_html += f"<p><b>Chế độ hộp số:</b> {mode_text}</p>"
-                ana_report_html += f"<p><b>i_g sử dụng:</b> {t.gearbox_ratio:.1f}</p>"
-            else:
-                ana_report_html += f"<p><b>Chế độ hộp số:</b> Auto</p>"
-                ana_report_html += f"<p><b>i_g sử dụng:</b> {t.gearbox_ratio:.1f}</p>"
-            # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
-            
-            ana_report_html += f"<p><b>Hộp số giảm tốc:</b> Tỉ số truyền = {t.gearbox_ratio}</p>"
-            ana_report_html += f"<p><b>Bộ truyền nhông-xích:</b> {t.drive_sprocket_teeth} răng → {t.driven_sprocket_teeth} răng</p>"
-            ana_report_html += f"<p><b>Xích:</b> {t.chain_designation} (bước {t.chain_pitch_mm} mm)</p>"
-            ana_report_html += f"<p><b>Tổng tỉ số truyền:</b> {t.total_transmission_ratio:.2f}</p>"
-            ana_report_html += f"<p><b>Vận tốc thực tế:</b> {t.actual_belt_velocity:.3f} m/s</p>"
-            ana_report_html += f"<p><b>Sai số:</b> {t.error:.2f}%</p>"
-            
-            # --- [BẮT ĐẦU NÂNG CẤP THEO KẾ HOẠCH] ---
-            # Hiển thị thông tin mới theo kế hoạch Plan C
-            ana_report_html += f"<p><b>Lực kéo yêu cầu:</b> {t.required_force_kN:.2f} kN</p>"
-            ana_report_html += f"<p><b>Lực kéo cho phép:</b> {t.allowable_kN:.2f} kN</p>"
-            ana_report_html += f"<p><b>Hệ số an toàn:</b> {t.safety_margin:.2f}</p>"
-            ana_report_html += f"<p><b>Trọng lượng xích:</b> {t.chain_weight_kgpm:.3f} kg/m</p>"
-            # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
-        else:
-            ana_report_html += "<p style='color: #64748b;'><i>Không tìm thấy bộ truyền động phù hợp</i></p>"
+        # Loại bỏ phần hiển thị bộ truyền động hoàn chỉnh vì đã có trong tab Cấu trúc đề xuất
         # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
 
         # Logic mới để hiển thị kết quả truyền động kép

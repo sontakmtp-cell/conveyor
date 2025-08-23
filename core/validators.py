@@ -48,8 +48,6 @@ def validate_input_ranges(p: ConveyorParameters) -> List[str]:
             )
         elif p.Qt_tph > 0.95 * Qt_calc:
             warns.append(f"Lưu lượng yêu cầu đang tiệm cận năng lực tiết diện ({p.Qt_tph/Qt_calc*100:.1f}%).")
-        # Chuyển “Lưu ý” khỏi nhóm cảnh báo UI (UI sẽ nêu như ghi chú)
-        warns.append("Lưu ý: từ phiên bản này, góc máng và surcharge tác động trực tiếp đến q_G và công suất.")
     except Exception:
         pass
 

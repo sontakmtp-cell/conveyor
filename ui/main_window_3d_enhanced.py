@@ -341,6 +341,10 @@ class Enhanced3DConveyorWindow(QMainWindow):
         # Thiết lập giá trị mặc định cho calculation_standard
         self.inputs.cbo_standard.setCurrentText("CEMA")
         self.inputs.update_drive_illustration(self.inputs.cbo_drive.currentText())
+        
+        # Cập nhật thông tin vật liệu mặc định
+        if self.inputs.cbo_material.count() > 0:
+            self._on_material_changed()
 
     def _connect(self):
         self.inputs.btn_calc.clicked.connect(self._full_calculate)
@@ -378,7 +382,7 @@ class Enhanced3DConveyorWindow(QMainWindow):
             belt_type=i.cbo_belt_type.currentText(),
             belt_thickness_mm=i.spn_thickness.value(),
             trough_angle_label=i.cbo_trough.currentText(),
-            surcharge_angle_deg=i.spn_surcharge.value(),
+            surcharge_angle_deg=i.spn_angle.value(),  # Luôn bằng góc nghiêng tự nhiên
             carrying_idler_spacing_m=i.spn_carrying.value(),
             return_idler_spacing_m=i.spn_return.value(),
             drive_type=i.cbo_drive.currentText(),
@@ -399,8 +403,8 @@ class Enhanced3DConveyorWindow(QMainWindow):
             # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
             
             # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
-            gearbox_ratio_mode=i.cbo_gearbox_ratio_mode.currentText().lower(),
-            gearbox_ratio_user=i.spn_gearbox_ratio_user.value() if i.cbo_gearbox_ratio_mode.currentText().lower() == "manual" else 0.0,
+            gearbox_ratio_mode="manual" if i.cbo_gearbox_ratio_mode.currentText().lower() == "chỉ định" else "auto",
+            gearbox_ratio_user=i.spn_gearbox_ratio_user.value() if i.cbo_gearbox_ratio_mode.currentText().lower() == "chỉ định" else 0.0,
             # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
             db_path=self.db_path
         )
@@ -447,12 +451,37 @@ class Enhanced3DConveyorWindow(QMainWindow):
         mat = self.inputs.cbo_material.currentText()
         d = ACTIVE_MATERIAL_DB.get(mat, {})
         if d:
-            self.inputs.spn_density.setValue(d.get("density", 1.6))
-            self.inputs.spn_angle.setValue(d.get("angle_repose", 30))
-            vmax = d.get("v_max", 4.0)
-            if self.inputs.spn_speed.value() > vmax:
-                self.inputs.spn_speed.setValue(round(0.8 * vmax, 2))
+            # Cập nhật thông tin vật liệu
+            density = d.get("density", 1.6)
+            angle_repose = d.get("angle_repose", 30)
+            v_max = d.get("v_max", 4.0)
+            abrasive = d.get("abrasive", "medium")
+            temperature_max = d.get("temperature_max", 60)
+            moisture = d.get("moisture", "low")
+            
+            # Cập nhật UI
+            self.inputs.spn_density.setValue(density)
+            self.inputs.spn_angle.setValue(angle_repose)
+            # Góc chất tải luôn bằng góc nghiêng tự nhiên, không cần cập nhật spn_surcharge
+            
+            # Cập nhật label thông tin vật liệu
+            info_text = f"Khối lượng riêng: {density} tấn/m³ | Góc mái: {angle_repose}° | Tốc độ tối đa: {v_max} m/s | Mài mòn: {abrasive} | Nhiệt độ tối đa: {temperature_max}°C | Độ ẩm: {moisture}"
+            self.inputs.lbl_material_info.setText(info_text)
+            self.inputs.lbl_material_info.setStyleSheet("color: #2563eb; font-style: normal; padding: 5px; background-color: #eff6ff; border: 1px solid #dbeafe; border-radius: 4px;")
+            
+            # Kiểm tra và điều chỉnh tốc độ nếu cần
+            if self.inputs.spn_speed.value() > v_max:
+                self.inputs.spn_speed.setValue(round(0.8 * v_max, 2))
                 self.statusBar().showMessage(f"Tốc độ đã được chỉnh theo {mat}.")
+            
+            # Tự động tính toán lại khi vật liệu thay đổi
+            if hasattr(self, 'current_result') and self.current_result is not None:
+                self.statusBar().showMessage(f"🔄 Đang tính toán lại với vật liệu {mat}...")
+                self._start_thread(self._collect())
+        else:
+            # Reset label khi không có thông tin vật liệu
+            self.inputs.lbl_material_info.setText("Vật liệu không xác định")
+            self.inputs.lbl_material_info.setStyleSheet("color: #dc2626; font-style: italic; padding: 5px; background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 4px;")
 
     def _on_finished(self, result: CalculationResult):
         self.current_result = result
