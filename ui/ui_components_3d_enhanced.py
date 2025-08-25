@@ -11,12 +11,12 @@ UI components nâng cấp: Panel nhập liệu + Panel kết quả (2D/3D).
 from __future__ import annotations
 
 import os
-from PySide6.QtCore import Qt, QByteArray, Signal, Slot
+from PySide6.QtCore import Qt, QByteArray, Signal, Slot, QTimer, QThread
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QComboBox,
     QDoubleSpinBox, QSpinBox, QLineEdit, QPushButton, QScrollArea, QFrame,
     QTableWidget, QTableWidgetItem, QTextEdit, QTabWidget, QProgressBar, QLabel,
-    QCheckBox, QStackedWidget, QSlider, QGridLayout
+    QCheckBox, QStackedWidget, QSlider, QGridLayout, QMessageBox
 )
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtGui import QPixmap, QFont
@@ -28,9 +28,11 @@ from .plotting import EnhancedPlotCanvas
 HAS_3D_SUPPORT = False
 try:
     from .visualization_3d import Visualization3DWidget  # type: ignore
+    from .visualization_3d.enhanced_widget import EnhancedVisualization3DWidget  # type: ignore
     HAS_3D_SUPPORT = True
 except Exception:
     Visualization3DWidget = None  # type: ignore
+    EnhancedVisualization3DWidget = None  # type: ignore
 
 # >>> import tooltips
 try:
@@ -1146,8 +1148,42 @@ class Enhanced3DResultsPanel(QWidget):
         l2d.addWidget(controls_2d); l2d.addWidget(self.canvas)
 
         if HAS_3D_SUPPORT:
-            self.viz_3d = Visualization3DWidget()
+            # Sử dụng EnhancedVisualization3DWidget nâng cao
+            try:
+                print("DEBUG: Đang tạo EnhancedVisualization3DWidget...")
+                self.viz_3d = EnhancedVisualization3DWidget()
+                print("DEBUG: Đã tạo EnhancedVisualization3DWidget thành công")
+                
+                # Đảm bảo widget 3D hiển thị nội dung mặc định
+                self._initialize_3d_widget_content()
+                
+                # Kết nối signals để cập nhật visualization khi có dữ liệu mới
+                if hasattr(self.viz_3d, 'visualization_updated'):
+                    self.viz_3d.visualization_updated.connect(self._on_3d_visualization_updated)
+                
+            except Exception as e:
+                print(f"DEBUG: Không thể tạo EnhancedVisualization3DWidget: {e}")
+                print(f"DEBUG: Exception type: {type(e)}")
+                import traceback
+                traceback.print_exc()
+                # Fallback về widget cũ
+                try:
+                    print("DEBUG: Đang thử tạo Visualization3DWidget...")
+                    self.viz_3d = Visualization3DWidget()
+                    print("DEBUG: Đã tạo Visualization3DWidget thành công")
+                    
+                    # Đảm bảo widget 3D hiển thị nội dung mặc định
+                    self._initialize_3d_widget_content()
+                    
+                except Exception as e2:
+                    print(f"DEBUG: Không thể tạo Visualization3DWidget: {e2}")
+                    self.viz_3d = QWidget()
+                    ph = QVBoxLayout(self.viz_3d)
+                    lab = QLabel("3D Visualization không khả dụng.\n\nCài đặt: pip install PySide6 PySide6-WebEngine")
+                    lab.setAlignment(Qt.AlignCenter); lab.setStyleSheet("color:#64748b; font-size:14px; padding:50px;")
+                    ph.addWidget(lab)
         else:
+            print("DEBUG: HAS_3D_SUPPORT = False")
             self.viz_3d = QWidget()
             ph = QVBoxLayout(self.viz_3d)
             lab = QLabel("3D Visualization không khả dụng.\n\nCài đặt: pip install PySide6 PySide6-WebEngine")
@@ -1169,6 +1205,245 @@ class Enhanced3DResultsPanel(QWidget):
         self._current_params = None
         self._current_result = None
         self._current_theme = "light"
+
+    def _initialize_3d_widget_content(self):
+        """Khởi tạo nội dung mặc định cho widget 3D"""
+        try:
+            if hasattr(self.viz_3d, 'setHtml'):
+                # Nếu là WebEngine, hiển thị HTML mặc định
+                default_html = """
+                <html>
+                <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin: 0; min-height: 100vh;">
+                    <div style="background: rgba(255,255,255,0.1); border-radius: 20px; padding: 40px; backdrop-filter: blur(10px); max-width: 800px; margin: 0 auto;">
+                        <h1 style="font-size: 32px; margin-bottom: 20px;">🏗️ Mô hình 3D Băng tải</h1>
+                        <p style="font-size: 18px; margin-bottom: 30px;">Chào mừng bạn đến với hệ thống visualization 3D nâng cao!</p>
+                        
+                        <div style="background: rgba(255,255,255,0.2); border-radius: 15px; padding: 25px; margin: 20px 0;">
+                            <h3 style="color: #fbbf24; margin-bottom: 15px;">🚀 Để bắt đầu:</h3>
+                            <ol style="text-align: left; font-size: 16px; line-height: 1.8;">
+                                <li>Nhập thông số băng tải (chiều dài, bề rộng, lưu lượng...)</li>
+                                <li>Chọn vật liệu và loại băng phù hợp</li>
+                                <li>Nhấn nút "Tính toán" hoặc "Tính nhanh"</li>
+                                <li>Xem kết quả và click "Mô hình 3D" để xem visualization</li>
+                            </ol>
+                        </div>
+                        
+                        <div style="background: rgba(255,255,255,0.2); border-radius: 15px; padding: 25px; margin: 20px 0;">
+                            <h3 style="color: #34d399; margin-bottom: 15px;">✨ Tính năng nâng cao:</h3>
+                            <ul style="text-align: left; font-size: 16px; line-height: 1.8;">
+                                <li>Mô hình 3D chi tiết với các thành phần cơ khí</li>
+                                <li>Animation chuyển động thực tế</li>
+                                <li>Phân tích vật lý và kỹ thuật</li>
+                                <li>Giao diện tương tác trực quan</li>
+                            </ul>
+                        </div>
+                        
+                        <button onclick="showDemo()" style="background: linear-gradient(45deg, #3b82f6, #1d4ed8); color: white; border: none; padding: 15px 30px; font-size: 16px; font-weight: bold; border-radius: 25px; cursor: pointer; margin-top: 20px; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4); transition: all 0.3s ease;">
+                            🎮 Xem Demo 3D
+                        </button>
+                        
+                        <div id="demo-container" style="display: none; margin-top: 30px;">
+                            <div style="background: rgba(0,0,0,0.8); border-radius: 15px; padding: 20px;">
+                                <h3 style="color: #fbbf24;">🎮 Demo 3D Băng tải</h3>
+                                <p style="color: #e5e7eb;">Đây là demo mẫu. Để xem mô hình thực tế, hãy chạy tính toán!</p>
+                                <div id="three-container" style="width: 100%; height: 400px; background: #1f2937; border-radius: 10px; margin: 15px 0;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <script>
+                    function showDemo() {
+                        const container = document.getElementById('demo-container');
+                        const threeContainer = document.getElementById('three-container');
+                        
+                        if (container.style.display === 'none') {
+                            container.style.display = 'block';
+                            
+                            // Tạo demo 3D đơn giản với Three.js
+                            try {
+                                // Kiểm tra xem Three.js đã được load chưa
+                                if (typeof THREE === 'undefined') {
+                                    // Load Three.js từ CDN nếu chưa có
+                                    const script = document.createElement('script');
+                                    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+                                    script.onload = function() {
+                                        createThreeDemo();
+                                    };
+                                    document.head.appendChild(script);
+                                } else {
+                                    createThreeDemo();
+                                }
+                            } catch (e) {
+                                console.log('Three.js not available, showing simple demo');
+                                showSimpleDemo();
+                            }
+                        } else {
+                            container.style.display = 'none';
+                        }
+                    }
+                    
+                    function createThreeDemo() {
+                        const threeContainer = document.getElementById('three-container');
+                        
+                        // Tạo scene
+                        const scene = new THREE.Scene();
+                        scene.background = new THREE.Color(0x1f2937);
+                        
+                        // Tạo camera
+                        const camera = new THREE.PerspectiveCamera(75, threeContainer.clientWidth / threeContainer.clientHeight, 0.1, 1000);
+                        camera.position.set(0, 5, 10);
+                        
+                        // Tạo renderer
+                        const renderer = new THREE.WebGLRenderer({ antialias: true });
+                        renderer.setSize(threeContainer.clientWidth, threeContainer.clientHeight);
+                        renderer.shadowMap.enabled = true;
+                        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                        
+                        // Xóa nội dung cũ
+                        threeContainer.innerHTML = '';
+                        threeContainer.appendChild(renderer.domElement);
+                        
+                        // Tạo băng tải
+                        const beltGeometry = new THREE.BoxGeometry(8, 0.3, 1.5);
+                        const beltMaterial = new THREE.MeshLambertMaterial({ color: 0x10b981 });
+                        const belt = new THREE.Mesh(beltGeometry, beltMaterial);
+                        belt.position.y = 0.15;
+                        belt.castShadow = true;
+                        scene.add(belt);
+                        
+                        // Tạo con lăn
+                        const idlerGeometry = new THREE.CylinderGeometry(0.4, 0.4, 1.8, 8);
+                        const idlerMaterial = new THREE.MeshLambertMaterial({ color: 0x6b7280 });
+                        
+                        const idler1 = new THREE.Mesh(idlerGeometry, idlerMaterial);
+                        idler1.position.set(-3, -0.2, 0);
+                        idler1.rotation.z = Math.PI / 2;
+                        idler1.castShadow = true;
+                        scene.add(idler1);
+                        
+                        const idler2 = new THREE.Mesh(idlerGeometry, idlerMaterial);
+                        idler2.position.set(3, -0.2, 0);
+                        idler2.rotation.z = Math.PI / 2;
+                        idler2.castShadow = true;
+                        scene.add(idler2);
+                        
+                        // Tạo khung đỡ
+                        const frameGeometry = new THREE.BoxGeometry(0.1, 0.8, 2);
+                        const frameMaterial = new THREE.MeshLambertMaterial({ color: 0x374151 });
+                        
+                        for (let i = -3; i <= 3; i += 1.5) {
+                            const frame = new THREE.Mesh(frameGeometry, frameMaterial);
+                            frame.position.set(i, -0.4, 0);
+                            frame.castShadow = true;
+                            scene.add(frame);
+                        }
+                        
+                        // Tạo lighting
+                        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+                        scene.add(ambientLight);
+                        
+                        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                        directionalLight.position.set(5, 10, 5);
+                        directionalLight.castShadow = true;
+                        directionalLight.shadow.mapSize.width = 1024;
+                        directionalLight.shadow.mapSize.height = 1024;
+                        scene.add(directionalLight);
+                        
+                        // Animation
+                        let time = 0;
+                        function animate() {
+                            requestAnimationFrame(animate);
+                            
+                            time += 0.02;
+                            
+                            // Xoay con lăn
+                            idler1.rotation.x += 0.05;
+                            idler2.rotation.x += 0.05;
+                            
+                            // Xoay camera
+                            camera.position.x = Math.sin(time * 0.5) * 10;
+                            camera.position.z = Math.cos(time * 0.5) * 10;
+                            camera.lookAt(0, 0, 0);
+                            
+                            renderer.render(scene, camera);
+                        }
+                        animate();
+                        
+                        // Xử lý resize
+                        window.addEventListener('resize', function() {
+                            camera.aspect = threeContainer.clientWidth / threeContainer.clientHeight;
+                            camera.updateProjectionMatrix();
+                            renderer.setSize(threeContainer.clientWidth, threeContainer.clientHeight);
+                        });
+                    }
+                    
+                    function showSimpleDemo() {
+                        const threeContainer = document.getElementById('three-container');
+                        threeContainer.innerHTML = '<div style="color: white; padding: 50px; text-align: center;"><h4>🎮 Demo 3D</h4><p>Three.js không khả dụng. Hãy cài đặt PySide6-WebEngine để xem demo 3D đầy đủ!</p></div>';
+                    }
+                    </script>
+                </body>
+                </html>
+                """
+                self.viz_3d.setHtml(default_html)
+            elif hasattr(self.viz_3d, 'setLayout'):
+                # Nếu là QWidget thông thường
+                default_widget = QWidget()
+                default_layout = QVBoxLayout(default_widget)
+                
+                title_label = QLabel("🏗️ Mô hình 3D Băng tải")
+                title_label.setStyleSheet("""
+                    QLabel {
+                        color: #1f2937;
+                        font-size: 24px;
+                        font-weight: bold;
+                        padding: 30px;
+                        text-align: center;
+                    }
+                """)
+                default_layout.addWidget(title_label)
+                
+                info_label = QLabel("Chào mừng bạn đến với hệ thống visualization 3D nâng cao!")
+                info_label.setStyleSheet("""
+                    QLabel {
+                        color: #6b7280;
+                        font-size: 16px;
+                        padding: 20px;
+                        text-align: center;
+                    }
+                """)
+                default_layout.addWidget(info_label)
+                
+                steps_label = QLabel("🚀 Để bắt đầu:\n1. Nhập thông số băng tải\n2. Chọn vật liệu và loại băng\n3. Nhấn 'Tính toán' hoặc 'Tính nhanh'\n4. Xem kết quả và click 'Mô hình 3D'")
+                steps_label.setStyleSheet("""
+                    QLabel {
+                        color: #059669;
+                        font-size: 14px;
+                        padding: 25px;
+                        text-align: center;
+                        background-color: #d1fae5;
+                        border: 1px solid #10b981;
+                        border-radius: 12px;
+                        margin: 20px;
+                    }
+                """)
+                steps_label.setWordWrap(True)
+                default_layout.addWidget(steps_label)
+                
+                self.viz_3d.setLayout(default_layout)
+            else:
+                print("DEBUG: viz_3d không hỗ trợ setHtml hoặc setLayout")
+                
+        except Exception as e:
+            print(f"DEBUG: Không thể khởi tạo nội dung mặc định cho widget 3D: {e}")
+            # Fallback: hiển thị thông báo đơn giản
+            try:
+                if hasattr(self.viz_3d, 'setText'):
+                    self.viz_3d.setText("🏗️ Mô hình 3D\n\nĐể xem mô hình 3D, hãy chạy tính toán trước!")
+                elif hasattr(self.viz_3d, 'setHtml'):
+                    self.viz_3d.setHtml("<h2>🏗️ Mô hình 3D</h2><p>Để xem mô hình 3D, hãy chạy tính toán trước!</p>")
+            except Exception as e2:
+                print(f"DEBUG: Không thể hiển thị fallback content: {e2}")
 
     # --- [BẮT ĐẦU NÂNG CẤP TỐI ƯU HÓA]
     def update_optimizer_results(self, results: list):
@@ -1226,11 +1501,40 @@ class Enhanced3DResultsPanel(QWidget):
         except Exception:
             pass
 
-        if HAS_3D_SUPPORT and hasattr(self.viz_3d, "update_visualization"):
+        # Cập nhật visualization 3D nâng cao nếu có
+        if HAS_3D_SUPPORT and hasattr(self.viz_3d, "update_enhanced_visualization"):
             try:
+                print("DEBUG: Cập nhật enhanced visualization 3D...")
+                self.viz_3d.update_enhanced_visualization(params, result)
+                print("✅ Đã cập nhật Enhanced 3D Visualization thành công")
+                
+                # Hiển thị thông báo thành công nếu đang ở chế độ 3D
+                if self.viz_stack.currentIndex() == 1:
+                    self._show_3d_success_message("Mô hình 3D đã được cập nhật với dữ liệu mới!")
+                    
+            except Exception as e:
+                print(f"❌ Lỗi cập nhật enhanced visualization: {e}")
+                if self.viz_stack.currentIndex() == 1:
+                    self._show_3d_error_message(f"Lỗi khi cập nhật mô hình 3D: {e}")
+        
+        # Fallback: cập nhật visualization 3D cơ bản nếu có
+        elif HAS_3D_SUPPORT and hasattr(self.viz_3d, "update_visualization"):
+            try:
+                print("DEBUG: Cập nhật basic visualization 3D...")
                 self.viz_3d.update_visualization(params, result, theme=theme)
-            except Exception:
-                pass
+                print("✅ Đã cập nhật Basic 3D Visualization thành công")
+                
+                # Hiển thị thông báo thành công nếu đang ở chế độ 3D
+                if self.viz_stack.currentIndex() == 1:
+                    self._show_3d_success_message("Mô hình 3D cơ bản đã được cập nhật!")
+                    
+            except Exception as e:
+                print(f"❌ Lỗi cập nhật basic visualization: {e}")
+                if self.viz_stack.currentIndex() == 1:
+                    self._show_3d_error_message(f"Lỗi khi cập nhật mô hình 3D cơ bản: {e}")
+        
+        else:
+            print("DEBUG: Không có method update visualization nào khả dụng")
 
     def _update_structural_tab(self, result) -> None:
         """Cập nhật tab 'Cấu trúc đề xuất' với dữ liệu từ kết quả tính toán."""
@@ -1389,9 +1693,272 @@ class Enhanced3DResultsPanel(QWidget):
     @Slot(int)
     def _switch_mode(self, index: int) -> None:
         """Chuyển đổi giữa chế độ xem 2D và 3D."""
+        print(f"DEBUG: _switch_mode được gọi với index={index}")
+        print(f"DEBUG: viz_stack có {self.viz_stack.count()} widgets")
+        print(f"DEBUG: viz_3d type: {type(self.viz_3d)}")
+        print(f"DEBUG: viz_3d có update_enhanced_visualization: {hasattr(self.viz_3d, 'update_enhanced_visualization')}")
+        
         self.viz_stack.setCurrentIndex(index)
         self.btn_2d_mode.setChecked(index == 0)
         self.btn_3d_mode.setChecked(index == 1)
+        
+        print(f"DEBUG: Đã chuyển sang index {index}, current index: {self.viz_stack.currentIndex()}")
+        
+        # Nếu chuyển sang 3D và có dữ liệu hiện tại, cập nhật visualization
+        if index == 1:
+            if hasattr(self, '_current_params') and hasattr(self, '_current_result') and self._current_params and self._current_result:
+                print("DEBUG: Cập nhật 3D visualization với dữ liệu hiện tại")
+                if hasattr(self.viz_3d, "update_enhanced_visualization"):
+                    try:
+                        self.viz_3d.update_enhanced_visualization(self._current_params, self._current_result)
+                        print("DEBUG: Đã cập nhật enhanced visualization thành công")
+                    except Exception as e:
+                        print(f"DEBUG: Lỗi khi cập nhật enhanced visualization: {e}")
+                        # Hiển thị thông báo lỗi cho người dùng
+                        self._show_3d_error_message(f"Lỗi khi cập nhật mô hình 3D: {e}")
+                elif hasattr(self.viz_3d, "update_visualization"):
+                    try:
+                        self.viz_3d.update_visualization(self._current_params, self._current_result)
+                        print("DEBUG: Đã cập nhật basic visualization thành công")
+                    except Exception as e:
+                        print(f"DEBUG: Lỗi khi cập nhật basic visualization: {e}")
+                        self._show_3d_error_message(f"Lỗi khi cập nhật mô hình 3D: {e}")
+                else:
+                    print("DEBUG: viz_3d không có method update visualization")
+                    self._show_3d_error_message("Widget 3D không hỗ trợ cập nhật visualization")
+            else:
+                print("DEBUG: Chưa có dữ liệu để hiển thị 3D")
+                # Hiển thị nội dung mặc định thay vì thông báo lỗi
+                self._show_3d_welcome_content()
+                
+            # Hiển thị thông báo hướng dẫn sử dụng
+            self._show_3d_usage_guide()
+        else:
+            # Chế độ 2D - ẩn thông báo hướng dẫn nếu có
+            self._hide_3d_usage_guide()
+
+    def _show_3d_error_message(self, error_msg: str):
+        """Hiển thị thông báo lỗi trong panel 3D"""
+        try:
+            # Tạo widget thông báo lỗi
+            error_widget = QWidget()
+            error_layout = QVBoxLayout(error_widget)
+            
+            error_label = QLabel("❌ Lỗi hiển thị mô hình 3D")
+            error_label.setStyleSheet("""
+                QLabel {
+                    color: #dc2626;
+                    font-size: 16px;
+                    font-weight: bold;
+                    padding: 20px;
+                    text-align: center;
+                }
+            """)
+            error_layout.addWidget(error_label)
+            
+            detail_label = QLabel(error_msg)
+            detail_label.setStyleSheet("""
+                QLabel {
+                    color: #6b7280;
+                    font-size: 14px;
+                    padding: 10px;
+                    text-align: center;
+                    word-wrap: true;
+                }
+            """)
+            detail_label.setWordWrap(True)
+            error_layout.addWidget(detail_label)
+            
+            help_label = QLabel("💡 Hãy thử:\n1. Chạy tính toán trước\n2. Kiểm tra cài đặt PySide6-WebEngine\n3. Khởi động lại ứng dụng")
+            help_label.setStyleSheet("""
+                QLabel {
+                    color: #059669;
+                    font-size: 12px;
+                    padding: 15px;
+                    text-align: center;
+                    background-color: #d1fae5;
+                    border: 1px solid #10b981;
+                    border-radius: 8px;
+                    margin: 10px;
+                }
+            """)
+            help_label.setWordWrap(True)
+            error_layout.addWidget(help_label)
+            
+            # Thay thế nội dung của viz_3d
+            if hasattr(self.viz_3d, 'setLayout'):
+                # Nếu viz_3d là QWidget thông thường
+                self.viz_3d.setLayout(error_layout)
+            elif hasattr(self.viz_3d, 'setHtml'):
+                # Nếu viz_3d là WebEngine
+                error_html = f"""
+                <html>
+                <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+                    <h2 style="color: #dc2626;">❌ Lỗi hiển thị mô hình 3D</h2>
+                    <p style="color: #6b7280; font-size: 16px;">{error_msg}</p>
+                    <div style="background-color: #d1fae5; border: 1px solid #10b981; border-radius: 8px; padding: 20px; margin: 20px;">
+                        <h3 style="color: #059669;">💡 Hãy thử:</h3>
+                        <ol style="text-align: left; color: #059669;">
+                            <li>Chạy tính toán trước</li>
+                            <li>Kiểm tra cài đặt PySide6-WebEngine</li>
+                            <li>Khởi động lại ứng dụng</li>
+                        </ol>
+                    </div>
+                </body>
+                </html>
+                """
+                self.viz_3d.setHtml(error_html)
+                
+        except Exception as e:
+            print(f"DEBUG: Không thể hiển thị thông báo lỗi: {e}")
+
+    def _show_3d_welcome_content(self):
+        """Hiển thị nội dung mặc định khi chưa có dữ liệu để hiển thị 3D"""
+        try:
+            # Tạo widget nội dung mặc định
+            welcome_widget = QWidget()
+            welcome_layout = QVBoxLayout(welcome_widget)
+            
+            title_label = QLabel("🏗️ Mô hình 3D")
+            title_label.setStyleSheet("""
+                QLabel {
+                    color: #1f2937;
+                    font-size: 24px;
+                    font-weight: bold;
+                    padding: 30px;
+                    text-align: center;
+                }
+            """)
+            welcome_layout.addWidget(title_label)
+            
+            info_label = QLabel("Chào mừng bạn đến với hệ thống visualization 3D nâng cao!")
+            info_label.setStyleSheet("""
+                QLabel {
+                    color: #6b7280;
+                    font-size: 16px;
+                    padding: 20px;
+                    text-align: center;
+                }
+            """)
+            welcome_layout.addWidget(info_label)
+            
+            steps_label = QLabel("🚀 Để bắt đầu:\n1. Nhập thông số băng tải\n2. Chọn vật liệu và loại băng\n3. Nhấn 'Tính toán' hoặc 'Tính nhanh'\n4. Xem kết quả và click 'Mô hình 3D'")
+            steps_label.setStyleSheet("""
+                QLabel {
+                    color: #059669;
+                    font-size: 14px;
+                    padding: 25px;
+                    text-align: center;
+                    background-color: #d1fae5;
+                    border: 1px solid #10b981;
+                    border-radius: 12px;
+                    margin: 20px;
+                }
+            """)
+            steps_label.setWordWrap(True)
+            welcome_layout.addWidget(steps_label)
+            
+            # Thêm nút demo
+            demo_btn = QPushButton("🎮 Xem Demo 3D")
+            demo_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #3b82f6;
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    font-size: 14px;
+                    font-weight: bold;
+                    border-radius: 8px;
+                    margin: 10px;
+                }
+                QPushButton:hover {
+                    background-color: #2563eb;
+                }
+                QPushButton:pressed {
+                    background-color: #1d4ed8;
+                }
+            """)
+            demo_btn.clicked.connect(self._show_3d_demo)
+            welcome_layout.addWidget(demo_btn)
+            
+            # Thay thế nội dung của viz_3d
+            if hasattr(self.viz_3d, 'setLayout'):
+                # Nếu viz_3d là QWidget thông thường
+                self.viz_3d.setLayout(welcome_layout)
+            elif hasattr(self.viz_3d, 'setHtml'):
+                # Nếu viz_3d là WebEngine
+                welcome_html = """
+                <html>
+                <head>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+                    <style>
+                        body { margin: 0; background: #000; }
+                        canvas { display: block; }
+                        .info { position: absolute; top: 10px; left: 10px; color: white; font-family: Arial; }
+                    </style>
+                </head>
+                <body>
+                    <div class="info">
+                        <h3>🎮 Demo Mô hình 3D Băng tải</h3>
+                        <p>Đây là demo mẫu. Để xem mô hình thực tế, hãy chạy tính toán!</p>
+                    </div>
+                    
+                    <script>
+                        // Demo 3D đơn giản
+                        const scene = new THREE.Scene();
+                        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                        const renderer = new THREE.WebGLRenderer();
+                        renderer.setSize(window.innerWidth, window.innerHeight);
+                        document.body.appendChild(renderer.domElement);
+                        
+                        // Tạo băng tải đơn giản
+                        const geometry = new THREE.BoxGeometry(5, 0.2, 1);
+                        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+                        const belt = new THREE.Mesh(geometry, material);
+                        scene.add(belt);
+                        
+                        camera.position.z = 5;
+                        
+                        function animate() {
+                            requestAnimationFrame(animate);
+                            belt.rotation.x += 0.01;
+                            renderer.render(scene, camera);
+                        }
+                        animate();
+                    </script>
+                </body>
+                </html>
+                """
+                self.viz_3d.setHtml(welcome_html)
+                
+        except Exception as e:
+            print(f"DEBUG: Không thể hiển thị nội dung mặc định: {e}")
+
+    def _on_3d_visualization_updated(self, data: dict):
+        """Xử lý khi visualization 3D được cập nhật"""
+        try:
+            print(f"DEBUG: Visualization 3D đã được cập nhật với dữ liệu: {data}")
+            # Có thể thêm logic xử lý bổ sung ở đây
+        except Exception as e:
+            print(f"DEBUG: Lỗi khi xử lý cập nhật visualization 3D: {e}")
+
+    def _show_3d_demo(self):
+        """Hiển thị demo 3D"""
+        try:
+            print("DEBUG: Hiển thị demo 3D")
+            # Chuyển sang tab 3D nếu chưa ở đó
+            if self.viz_stack.currentIndex() != 1:
+                self._switch_mode(1)
+            
+            # Hiển thị demo trong widget 3D
+            if hasattr(self.viz_3d, 'show_demo'):
+                self.viz_3d.show_demo()
+            else:
+                # Fallback: hiển thị nội dung demo mặc định
+                self._initialize_3d_widget_content()
+                
+        except Exception as e:
+            print(f"DEBUG: Lỗi khi hiển thị demo 3D: {e}")
 
     # --- [BẮT ĐẦU THÊM CHỨC NĂNG CHECKBOX] ---
     def _show_all_charts(self) -> None:
@@ -1421,3 +1988,109 @@ class Enhanced3DResultsPanel(QWidget):
             except Exception:
                 pass
     # --- [KẾT THÚC THÊM CHỨC NĂNG CHECKBOX] ---
+
+    def _show_3d_usage_guide(self):
+        """Hiển thị hướng dẫn sử dụng 3D visualization"""
+        try:
+            if not hasattr(self, '_usage_guide_widget'):
+                self._usage_guide_widget = QWidget()
+                guide_layout = QVBoxLayout(self._usage_guide_widget)
+                
+                guide_label = QLabel("💡 Hướng dẫn sử dụng Mô hình 3D:")
+                guide_label.setStyleSheet("""
+                    QLabel {
+                        color: #1f2937;
+                        font-size: 14px;
+                        font-weight: bold;
+                        padding: 10px;
+                        background-color: #fef3c7;
+                        border: 1px solid #f59e0b;
+                        border-radius: 8px;
+                        margin: 10px;
+                    }
+                """)
+                guide_layout.addWidget(guide_label)
+                
+                tips_label = QLabel("• Sử dụng chuột để xoay, zoom mô hình\n• Nhấn nút Demo để xem mô hình mẫu\n• Chạy tính toán để xem mô hình thực tế")
+                tips_label.setStyleSheet("""
+                    QLabel {
+                        color: #92400e;
+                        font-size: 12px;
+                        padding: 5px 10px;
+                        background-color: #fef3c7;
+                        border-radius: 6px;
+                        margin: 5px 10px;
+                    }
+                """)
+                tips_label.setWordWrap(True)
+                guide_layout.addWidget(tips_label)
+                
+                # Thêm vào layout chính nếu có thể
+                if hasattr(self, 'viz_stack') and self.viz_stack.count() > 1:
+                    # Thêm vào tab 3D
+                    current_widget = self.viz_stack.widget(1)
+                    if hasattr(current_widget, 'layout'):
+                        current_layout = current_widget.layout()
+                        if current_layout:
+                            current_layout.addWidget(self._usage_guide_widget)
+                
+        except Exception as e:
+            print(f"DEBUG: Không thể hiển thị hướng dẫn sử dụng: {e}")
+
+    def _hide_3d_usage_guide(self):
+        """Ẩn hướng dẫn sử dụng 3D visualization"""
+        try:
+            if hasattr(self, '_usage_guide_widget'):
+                self._usage_guide_widget.setVisible(False)
+        except Exception as e:
+            print(f"DEBUG: Không thể ẩn hướng dẫn sử dụng: {e}")
+
+    def _show_3d_success_message(self, message: str):
+        """Hiển thị thông báo thành công trong panel 3D"""
+        try:
+            # Tạo widget thông báo thành công
+            success_widget = QWidget()
+            success_layout = QVBoxLayout(success_widget)
+            
+            success_label = QLabel("✅ Thành công!")
+            success_label.setStyleSheet("""
+                QLabel {
+                    color: #059669;
+                    font-size: 16px;
+                    font-weight: bold;
+                    padding: 15px;
+                    text-align: center;
+                    background-color: #d1fae5;
+                    border: 1px solid #10b981;
+                    border-radius: 8px;
+                    margin: 10px;
+                }
+            """)
+            success_layout.addWidget(success_label)
+            
+            detail_label = QLabel(message)
+            detail_label.setStyleSheet("""
+                QLabel {
+                    color: #065f46;
+                    font-size: 14px;
+                    padding: 10px;
+                    text-align: center;
+                    word-wrap: true;
+                }
+            """)
+            detail_label.setWordWrap(True)
+            success_layout.addWidget(detail_label)
+            
+            # Tự động ẩn sau 3 giây
+            QTimer.singleShot(3000, lambda: success_widget.setVisible(False))
+            
+            # Thêm vào layout chính nếu có thể
+            if hasattr(self, 'viz_stack') and self.viz_stack.count() > 1:
+                current_widget = self.viz_stack.widget(1)
+                if hasattr(current_widget, 'layout'):
+                    current_layout = current_widget.layout()
+                    if current_layout:
+                        current_layout.addWidget(success_widget)
+                        
+        except Exception as e:
+            print(f"DEBUG: Không thể hiển thị thông báo thành công: {e}")

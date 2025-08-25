@@ -878,6 +878,16 @@ class Enhanced3DConveyorWindow(QMainWindow):
                 print(f"Error in update_visualizations: {e}")
                 import traceback
                 traceback.print_exc()
+        
+        # Cập nhật visualization nâng cao nếu có
+        if hasattr(self.results, 'viz_3d') and hasattr(self.results.viz_3d, 'update_enhanced_visualization'):
+            try:
+                self.results.viz_3d.update_enhanced_visualization(self.params, self.current_result)
+                print("✅ Đã cập nhật Enhanced 3D Visualization")
+            except Exception as e:
+                print(f"❌ Lỗi cập nhật Enhanced 3D Visualization: {e}")
+                import traceback
+                traceback.print_exc()
 
     def _toggle_chat_panel(self):
         """Toggle the chat panel visibility and sync menu item state."""

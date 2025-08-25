@@ -1,0 +1,865 @@
+{
+  "benchmark_suites": [
+    {
+      "name": "Performance Comparison",
+      "description": "So sánh performance của các thành phần khác nhau",
+      "test_cases": [
+        {
+          "name": "model_generation_small",
+          "parameters": {
+            "B_mm": 400,
+            "L_m": 25.0
+          },
+          "description": "Model generation với băng tải nhỏ"
+        },
+        {
+          "name": "model_generation_medium",
+          "parameters": {
+            "B_mm": 800,
+            "L_m": 50.0
+          },
+          "description": "Model generation với băng tải trung bình"
+        },
+        {
+          "name": "model_generation_large",
+          "parameters": {
+            "B_mm": 1600,
+            "L_m": 100.0
+          },
+          "description": "Model generation với băng tải lớn"
+        },
+        {
+          "name": "component_building_basic",
+          "parameters": {
+            "B_mm": 800,
+            "L_m": 50.0
+          },
+          "description": "Component building cơ bản"
+        },
+        {
+          "name": "component_building_complex",
+          "parameters": {
+            "B_mm": 1600,
+            "L_m": 100.0,
+            "trough_angle_label": "45°"
+          },
+          "description": "Component building phức tạp"
+        },
+        {
+          "name": "animation_performance_30fps",
+          "parameters": {
+            "belt_speed_mps": 1.0
+          },
+          "description": "Animation performance 30 FPS"
+        },
+        {
+          "name": "animation_performance_60fps",
+          "parameters": {
+            "belt_speed_mps": 2.5
+          },
+          "description": "Animation performance 60 FPS"
+        },
+        {
+          "name": "physics_simulation_simple",
+          "parameters": {
+            "B_mm": 800,
+            "L_m": 50.0,
+            "conveyor_inclination_deg": 0.0
+          },
+          "description": "Physics simulation đơn giản"
+        },
+        {
+          "name": "physics_simulation_complex",
+          "parameters": {
+            "B_mm": 1600,
+            "L_m": 100.0,
+            "conveyor_inclination_deg": 25.0
+          },
+          "description": "Physics simulation phức tạp"
+        },
+        {
+          "name": "optimization_low_quality",
+          "parameters": {
+            "B_mm": 800,
+            "L_m": 50.0
+          },
+          "description": "Optimization chất lượng thấp"
+        },
+        {
+          "name": "optimization_high_quality",
+          "parameters": {
+            "B_mm": 1600,
+            "L_m": 100.0
+          },
+          "description": "Optimization chất lượng cao"
+        },
+        {
+          "name": "full_workflow_small",
+          "parameters": {
+            "B_mm": 400,
+            "L_m": 25.0
+          },
+          "description": "Full workflow với băng tải nhỏ"
+        },
+        {
+          "name": "full_workflow_large",
+          "parameters": {
+            "B_mm": 1600,
+            "L_m": 100.0
+          },
+          "description": "Full workflow với băng tải lớn"
+        }
+      ],
+      "results": [
+        {
+          "test_name": "model_generation_small",
+          "execution_time": 1.2874603271484375e-05,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5906637,
+          "parameters": {
+            "B_mm": 400,
+            "L_m": 25.0
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "model_generation_medium",
+          "execution_time": 4.291534423828125e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5907052,
+          "parameters": {
+            "B_mm": 800,
+            "L_m": 50.0
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "model_generation_large",
+          "execution_time": 2.6226043701171875e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.590728,
+          "parameters": {
+            "B_mm": 1600,
+            "L_m": 100.0
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "component_building_basic",
+          "execution_time": 2.384185791015625e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5907476,
+          "parameters": {
+            "B_mm": 800,
+            "L_m": 50.0
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "component_building_complex",
+          "execution_time": 2.1457672119140625e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5907667,
+          "parameters": {
+            "B_mm": 1600,
+            "L_m": 100.0,
+            "trough_angle_label": "45°"
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "animation_performance_30fps",
+          "execution_time": 1.9073486328125e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5907862,
+          "parameters": {
+            "belt_speed_mps": 1.0
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "animation_performance_60fps",
+          "execution_time": 2.384185791015625e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.590809,
+          "parameters": {
+            "belt_speed_mps": 2.5
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "physics_simulation_simple",
+          "execution_time": 2.384185791015625e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5908306,
+          "parameters": {
+            "B_mm": 800,
+            "L_m": 50.0,
+            "conveyor_inclination_deg": 0.0
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "physics_simulation_complex",
+          "execution_time": 2.86102294921875e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5908525,
+          "parameters": {
+            "B_mm": 1600,
+            "L_m": 100.0,
+            "conveyor_inclination_deg": 25.0
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "optimization_low_quality",
+          "execution_time": 3.0994415283203125e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5908813,
+          "parameters": {
+            "B_mm": 800,
+            "L_m": 50.0
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "optimization_high_quality",
+          "execution_time": 2.86102294921875e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5909026,
+          "parameters": {
+            "B_mm": 1600,
+            "L_m": 100.0
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "full_workflow_small",
+          "execution_time": 1.9073486328125e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5909202,
+          "parameters": {
+            "B_mm": 400,
+            "L_m": 25.0
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "full_workflow_large",
+          "execution_time": 1.6689300537109375e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5909367,
+          "parameters": {
+            "B_mm": 1600,
+            "L_m": 100.0
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        }
+      ],
+      "summary": {
+        "total_tests": 13,
+        "execution_time": {
+          "average": 3.337860107421875e-06,
+          "median": 2.384185791015625e-06,
+          "min": 1.6689300537109375e-06,
+          "max": 1.2874603271484375e-05,
+          "std_dev": 2.9426429401355773e-06
+        },
+        "memory_usage": {
+          "average": 0.0,
+          "median": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "std_dev": 0.0
+        },
+        "cpu_usage": {
+          "average": 0.0,
+          "median": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "std_dev": 0.0
+        },
+        "fps": {
+          "average": 0.0,
+          "median": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "std_dev": 0.0
+        }
+      }
+    },
+    {
+      "name": "Scalability Testing",
+      "description": "Test khả năng mở rộng với các kích thước khác nhau",
+      "test_cases": [
+        {
+          "name": "scalability_length_10m",
+          "parameters": {
+            "L_m": 10.0
+          },
+          "description": "Scalability test với chiều dài 10m"
+        },
+        {
+          "name": "scalability_length_25m",
+          "parameters": {
+            "L_m": 25.0
+          },
+          "description": "Scalability test với chiều dài 25m"
+        },
+        {
+          "name": "scalability_length_50m",
+          "parameters": {
+            "L_m": 50.0
+          },
+          "description": "Scalability test với chiều dài 50m"
+        },
+        {
+          "name": "scalability_length_100m",
+          "parameters": {
+            "L_m": 100.0
+          },
+          "description": "Scalability test với chiều dài 100m"
+        },
+        {
+          "name": "scalability_length_200m",
+          "parameters": {
+            "L_m": 200.0
+          },
+          "description": "Scalability test với chiều dài 200m"
+        },
+        {
+          "name": "scalability_length_500m",
+          "parameters": {
+            "L_m": 500.0
+          },
+          "description": "Scalability test với chiều dài 500m"
+        },
+        {
+          "name": "scalability_width_400mm",
+          "parameters": {
+            "B_mm": 400
+          },
+          "description": "Scalability test với chiều rộng 400mm"
+        },
+        {
+          "name": "scalability_width_600mm",
+          "parameters": {
+            "B_mm": 600
+          },
+          "description": "Scalability test với chiều rộng 600mm"
+        },
+        {
+          "name": "scalability_width_800mm",
+          "parameters": {
+            "B_mm": 800
+          },
+          "description": "Scalability test với chiều rộng 800mm"
+        },
+        {
+          "name": "scalability_width_1000mm",
+          "parameters": {
+            "B_mm": 1000
+          },
+          "description": "Scalability test với chiều rộng 1000mm"
+        },
+        {
+          "name": "scalability_width_1200mm",
+          "parameters": {
+            "B_mm": 1200
+          },
+          "description": "Scalability test với chiều rộng 1200mm"
+        },
+        {
+          "name": "scalability_width_1600mm",
+          "parameters": {
+            "B_mm": 1600
+          },
+          "description": "Scalability test với chiều rộng 1600mm"
+        },
+        {
+          "name": "scalability_width_2000mm",
+          "parameters": {
+            "B_mm": 2000
+          },
+          "description": "Scalability test với chiều rộng 2000mm"
+        },
+        {
+          "name": "scalability_angle_0°",
+          "parameters": {
+            "trough_angle_label": "0°"
+          },
+          "description": "Scalability test với góc máng 0°"
+        },
+        {
+          "name": "scalability_angle_20°",
+          "parameters": {
+            "trough_angle_label": "20°"
+          },
+          "description": "Scalability test với góc máng 20°"
+        },
+        {
+          "name": "scalability_angle_35°",
+          "parameters": {
+            "trough_angle_label": "35°"
+          },
+          "description": "Scalability test với góc máng 35°"
+        },
+        {
+          "name": "scalability_angle_45°",
+          "parameters": {
+            "trough_angle_label": "45°"
+          },
+          "description": "Scalability test với góc máng 45°"
+        }
+      ],
+      "results": [
+        {
+          "test_name": "scalability_length_10m",
+          "execution_time": 1.6689300537109375e-05,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5914733,
+          "parameters": {
+            "L_m": 10.0
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "scalability_length_25m",
+          "execution_time": 6.4373016357421875e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.591534,
+          "parameters": {
+            "L_m": 25.0
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "scalability_length_50m",
+          "execution_time": 3.337860107421875e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.591565,
+          "parameters": {
+            "L_m": 50.0
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "scalability_length_100m",
+          "execution_time": 2.384185791015625e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5915873,
+          "parameters": {
+            "L_m": 100.0
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "scalability_length_200m",
+          "execution_time": 2.6226043701171875e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.591609,
+          "parameters": {
+            "L_m": 200.0
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "scalability_length_500m",
+          "execution_time": 1.9073486328125e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.591628,
+          "parameters": {
+            "L_m": 500.0
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "scalability_width_400mm",
+          "execution_time": 1.9073486328125e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5916457,
+          "parameters": {
+            "B_mm": 400
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "scalability_width_600mm",
+          "execution_time": 1.9073486328125e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5916622,
+          "parameters": {
+            "B_mm": 600
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "scalability_width_800mm",
+          "execution_time": 2.1457672119140625e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5916789,
+          "parameters": {
+            "B_mm": 800
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "scalability_width_1000mm",
+          "execution_time": 1.9073486328125e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5917,
+          "parameters": {
+            "B_mm": 1000
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "scalability_width_1200mm",
+          "execution_time": 1.430511474609375e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5917163,
+          "parameters": {
+            "B_mm": 1200
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "scalability_width_1600mm",
+          "execution_time": 1.430511474609375e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5917335,
+          "parameters": {
+            "B_mm": 1600
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "scalability_width_2000mm",
+          "execution_time": 1.430511474609375e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.59175,
+          "parameters": {
+            "B_mm": 2000
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "scalability_angle_0°",
+          "execution_time": 1.6689300537109375e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5917683,
+          "parameters": {
+            "trough_angle_label": "0°"
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "scalability_angle_20°",
+          "execution_time": 2.86102294921875e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.59179,
+          "parameters": {
+            "trough_angle_label": "20°"
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "scalability_angle_35°",
+          "execution_time": 1.9073486328125e-06,
+          "memory_usage_mb": 0.00390625,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5918107,
+          "parameters": {
+            "trough_angle_label": "35°"
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        },
+        {
+          "test_name": "scalability_angle_45°",
+          "execution_time": 2.1457672119140625e-06,
+          "memory_usage_mb": 0.0,
+          "cpu_usage_percent": 0.0,
+          "fps": 0.0,
+          "triangle_count": 0,
+          "texture_memory_mb": 0.0,
+          "timestamp": 1756112189.5918336,
+          "parameters": {
+            "trough_angle_label": "45°"
+          },
+          "metadata": {
+            "fps": 0.0,
+            "triangle_count": 0,
+            "texture_memory_mb": 0.0
+          }
+        }
+      ],
+      "summary": {
+        "total_tests": 17,
+        "execution_time": {
+          "average": 3.183589262120864e-06,
+          "median": 1.9073486328125e-06,
+          "min": 1.430511474609375e-06,
+          "max": 1.6689300537109375e-05,
+          "std_dev": 3.6732531339085726e-06
+        },
+        "memory_usage": {
+          "average": 0.00022977941176470588,
+          "median": 0.0,
+          "min": 0.0,
+          "max": 0.00390625,
+          "std_dev": 0.0009474047852981757
+        },
+        "cpu_usage": {
+          "average": 0.0,
+          "median": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "std_dev": 0.0
+        },
+        "fps": {
+          "average": 0.0,
+          "median": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "std_dev": 0.0
+        }
+      }
+    }
+  ],
+  "summary": {
+    "total_suites": 2,
+    "total_tests": 30,
+    "timestamp": 1756112189.5921304
+  }
+}

@@ -1,645 +1,1104 @@
 """
-Enhanced 3D Visualization Widget
+Enhanced Visualization 3D Widget
+Widget PyQt6 với các panel điều khiển và hiển thị thông tin nâng cao
 """
 
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, 
-                             QCheckBox, QComboBox, QLabel, QPushButton, 
-                             QSlider, QSpinBox, QDoubleSpinBox, QTabWidget)
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QFont
+import json
+from typing import Dict, Any, Optional
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, 
+    QCheckBox, QComboBox, QPushButton, QSlider, QSpinBox,
+    QDoubleSpinBox, QTabWidget, QTextEdit, QProgressBar,
+    QSplitter, QFrame, QScrollArea
+)
+from PySide6.QtCore import Qt, QTimer, Signal as pyqtSignal
+from PySide6.QtGui import QFont, QPalette, QColor
 
-from .core.model_generator import ConveyorModelGenerator
 from .core.animation_engine import ConveyorAnimationEngine
-from .templates.html_templates import ENHANCED_HTML_TEMPLATE, SIMPLE_HTML_TEMPLATE
-from .templates.js_templates import ENHANCED_JS_TEMPLATE, BASIC_JS_TEMPLATE
+from .core.component_builder import ComponentBuilderManager
+from .core.physics_simulator import ConveyorPhysicsSimulator
+from .core.model_generator import ConveyorModelGenerator
 
 
-class EnhancedVisualization3DWidget(QWidget):
-    """Widget visualization 3D nâng cấp"""
+class AnimationControlPanel(QWidget):
+    """Panel điều khiển animation"""
     
-    # Signals
-    visualization_updated = pyqtSignal(dict)
-    component_selected = pyqtSignal(str)
-    animation_state_changed = pyqtSignal(bool)
+    animation_changed = pyqtSignal(dict)
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.model_generator = None
         self.animation_engine = None
-        self.current_data = {}
-        self.visualization_mode = 'enhanced'
-        
         self._setup_ui()
-        self._setup_enhanced_features()
-        self._setup_connections()
-        
-        # Timer cho performance monitoring
-        self.performance_timer = QTimer()
-        self.performance_timer.timeout.connect(self._update_performance_info)
-        self.performance_timer.start(1000)  # Cập nhật mỗi giây
     
     def _setup_ui(self):
-        """Thiết lập giao diện cơ bản"""
-        self.main_layout = QVBoxLayout(self)
+        """Thiết lập giao diện"""
+        layout = QVBoxLayout(self)
         
-        # Header
-        header_layout = QHBoxLayout()
-        title_label = QLabel("🎯 Băng tải 3D nâng cao")
-        title_label.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
-        header_layout.addWidget(title_label)
-        header_layout.addStretch()
+        # Nhóm điều khiển chính
+        main_group = QGroupBox("Điều khiển Animation")
+        main_layout = QVBoxLayout(main_group)
         
-        # Mode selector
-        self.mode_combo = QComboBox()
-        self.mode_combo.addItems(["Nâng cao", "Đơn giản", "Phân tích"])
-        self.mode_combo.setCurrentText("Nâng cao")
-        header_layout.addWidget(QLabel("Chế độ:"))
-        header_layout.addWidget(self.mode_combo)
+        # Nút Play/Pause
+        self.play_pause_btn = QPushButton("⏸️ Tạm dừng")
+        self.play_pause_btn.setCheckable(True)
+        self.play_pause_btn.setChecked(True)
+        self.play_pause_btn.clicked.connect(self._toggle_play_pause)
+        main_layout.addWidget(self.play_pause_btn)
         
-        self.main_layout.addLayout(header_layout)
+        # Nút Reset
+        self.reset_btn = QPushButton("🔄 Đặt lại")
+        self.reset_btn.clicked.connect(self._reset_animation)
+        main_layout.addWidget(self.reset_btn)
         
-        # Main content area
-        self.content_layout = QHBoxLayout()
+        # Điều khiển tốc độ
+        speed_layout = QHBoxLayout()
+        speed_layout.addWidget(QLabel("Tốc độ:"))
         
-        # Left panel - Controls
-        self.left_panel = self._create_left_panel()
-        self.content_layout.addWidget(self.left_panel, 1)
+        self.speed_slider = QSlider(Qt.Orientation.Horizontal)
+        self.speed_slider.setRange(10, 500)
+        self.speed_slider.setValue(100)
+        self.speed_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.speed_slider.setTickInterval(50)
+        self.speed_slider.valueChanged.connect(self._speed_changed)
+        speed_layout.addWidget(self.speed_slider)
         
-        # Center - Visualization area
-        self.visualization_area = self._create_visualization_area()
-        self.content_layout.addWidget(self.visualization_area, 4)
+        self.speed_label = QLabel("1.0x")
+        speed_layout.addWidget(self.speed_label)
+        main_layout.addLayout(speed_layout)
         
-        # Right panel - Info
-        self.right_panel = self._create_right_panel()
-        self.content_layout.addWidget(self.right_panel, 1)
+        layout.addWidget(main_group)
         
-        self.main_layout.addLayout(self.content_layout)
-        
-        # Bottom panel - Animation controls
-        self.bottom_panel = self._create_bottom_panel()
-        self.main_layout.addWidget(self.bottom_panel)
-    
-    def _create_left_panel(self):
-        """Tạo panel bên trái với các controls"""
-        panel = QGroupBox("🎛️ Điều khiển")
-        layout = QVBoxLayout(panel)
-        
-        # Component visibility controls
-        component_group = QGroupBox("Thành phần hiển thị")
+        # Nhóm điều khiển thành phần
+        component_group = QGroupBox("Hiển thị thành phần")
         component_layout = QVBoxLayout(component_group)
         
-        self.chk_belt_system = QCheckBox("Băng tải")
+        self.chk_belt_system = QCheckBox("Hệ thống băng tải")
         self.chk_belt_system.setChecked(True)
+        self.chk_belt_system.toggled.connect(self._component_toggled)
         component_layout.addWidget(self.chk_belt_system)
         
         self.chk_drive_system = QCheckBox("Hệ truyền động")
         self.chk_drive_system.setChecked(True)
+        self.chk_drive_system.toggled.connect(self._component_toggled)
         component_layout.addWidget(self.chk_drive_system)
         
         self.chk_support_structure = QCheckBox("Khung đỡ")
         self.chk_support_structure.setChecked(True)
+        self.chk_support_structure.toggled.connect(self._component_toggled)
         component_layout.addWidget(self.chk_support_structure)
         
         self.chk_material_flow = QCheckBox("Dòng vật liệu")
         self.chk_material_flow.setChecked(True)
+        self.chk_material_flow.toggled.connect(self._component_toggled)
         component_layout.addWidget(self.chk_material_flow)
         
         layout.addWidget(component_group)
         
-        # Material controls
-        material_group = QGroupBox("🎨 Chế độ hiển thị")
-        material_layout = QVBoxLayout(material_group)
-        
-        self.material_combo = QComboBox()
-        self.material_combo.addItems(["Thực tế", "Wireframe", "Phân tích nhiệt"])
-        material_layout.addWidget(QLabel("Chế độ:"))
-        material_layout.addWidget(self.material_combo)
-        
-        layout.addWidget(material_group)
-        
-        # Camera controls
-        camera_group = QGroupBox("📷 Góc nhìn")
+        # Nhóm điều khiển camera
+        camera_group = QGroupBox("Điều khiển camera")
         camera_layout = QVBoxLayout(camera_group)
         
         self.camera_preset_combo = QComboBox()
         self.camera_preset_combo.addItems([
             "Tổng quan", "Hệ truyền động", "Con lăn", "Băng tải", "Tùy chỉnh"
         ])
-        camera_layout.addWidget(QLabel("Góc nhìn:"))
+        self.camera_preset_combo.currentTextChanged.connect(self._camera_preset_changed)
         camera_layout.addWidget(self.camera_preset_combo)
         
-        self.reset_camera_btn = QPushButton("🔄 Reset camera")
-        camera_layout.addWidget(self.reset_camera_btn)
+        # Nút camera
+        camera_btn_layout = QHBoxLayout()
+        self.front_btn = QPushButton("Trước")
+        self.front_btn.clicked.connect(lambda: self._set_camera_view("front"))
+        camera_btn_layout.addWidget(self.front_btn)
         
+        self.side_btn = QPushButton("Bên")
+        self.side_btn.clicked.connect(lambda: self._set_camera_view("side"))
+        camera_btn_layout.addWidget(self.side_btn)
+        
+        self.top_btn = QPushButton("Trên")
+        self.top_btn.clicked.connect(lambda: self._set_camera_view("top"))
+        camera_btn_layout.addWidget(self.top_btn)
+        
+        camera_layout.addLayout(camera_btn_layout)
         layout.addWidget(camera_group)
         
-        # Performance controls
-        performance_group = QGroupBox("⚡ Hiệu suất")
-        performance_layout = QVBoxLayout(performance_group)
+        # Nhóm điều khiển chất liệu
+        material_group = QGroupBox("Chế độ hiển thị")
+        material_layout = QVBoxLayout(material_group)
+        
+        self.material_combo = QComboBox()
+        self.material_combo.addItems(["Thực tế", "Wireframe", "Phân tích nhiệt", "Phân tích ứng suất"])
+        self.material_combo.currentTextChanged.connect(self._material_mode_changed)
+        material_layout.addWidget(self.material_combo)
+        
+        # Điều khiển độ trong suốt
+        opacity_layout = QHBoxLayout()
+        opacity_layout.addWidget(QLabel("Độ trong suốt:"))
+        
+        self.opacity_slider = QSlider(Qt.Orientation.Horizontal)
+        self.opacity_slider.setRange(10, 100)
+        self.opacity_slider.setValue(100)
+        self.opacity_slider.valueChanged.connect(self._opacity_changed)
+        opacity_layout.addWidget(self.opacity_slider)
+        
+        self.opacity_label = QLabel("100%")
+        opacity_layout.addWidget(self.opacity_label)
+        material_layout.addLayout(opacity_layout)
+        
+        layout.addWidget(material_group)
+        
+        # Nhóm điều khiển nâng cao
+        advanced_group = QGroupBox("Tính năng nâng cao")
+        advanced_layout = QVBoxLayout(advanced_group)
+        
+        self.chk_physics_simulation = QCheckBox("Mô phỏng vật lý")
+        self.chk_physics_simulation.setChecked(False)
+        self.chk_physics_simulation.toggled.connect(self._physics_simulation_toggled)
+        advanced_layout.addWidget(self.chk_physics_simulation)
+        
+        self.chk_particle_system = QCheckBox("Hệ thống hạt")
+        self.chk_particle_system.setChecked(True)
+        self.chk_particle_system.toggled.connect(self._particle_system_toggled)
+        advanced_layout.addWidget(self.chk_particle_system)
         
         self.chk_shadows = QCheckBox("Bóng đổ")
         self.chk_shadows.setChecked(True)
-        performance_layout.addWidget(self.chk_shadows)
+        self.chk_shadows.toggled.connect(self._shadows_toggled)
+        advanced_layout.addWidget(self.chk_shadows)
         
         self.chk_antialiasing = QCheckBox("Khử răng cưa")
         self.chk_antialiasing.setChecked(True)
-        performance_layout.addWidget(self.chk_antialiasing)
+        self.chk_antialiasing.toggled.connect(self._antialiasing_toggled)
+        advanced_layout.addWidget(self.chk_antialiasing)
         
-        self.quality_slider = QSlider(Qt.Orientation.Horizontal)
-        self.quality_slider.setRange(1, 5)
-        self.quality_slider.setValue(3)
-        self.quality_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
-        self.quality_slider.setTickInterval(1)
-        performance_layout.addWidget(QLabel("Chất lượng:"))
-        performance_layout.addWidget(self.quality_slider)
+        layout.addWidget(advanced_group)
         
-        layout.addWidget(performance_group)
+        # Thêm stretch để đẩy các widget lên trên
+        layout.addStretch()
+    
+    def set_animation_engine(self, engine: ConveyorAnimationEngine):
+        """Thiết lập animation engine"""
+        self.animation_engine = engine
+    
+    def _toggle_play_pause(self):
+        """Chuyển đổi play/pause"""
+        if self.animation_engine:
+            if self.play_pause_btn.isChecked():
+                self.animation_engine.play()
+                self.play_pause_btn.setText("⏸️ Tạm dừng")
+            else:
+                self.animation_engine.pause()
+                self.play_pause_btn.setText("▶️ Phát")
+            
+            self.animation_changed.emit({
+                'action': 'play_pause',
+                'is_playing': self.play_pause_btn.isChecked()
+            })
+    
+    def _reset_animation(self):
+        """Đặt lại animation"""
+        if self.animation_engine:
+            self.animation_engine.reset()
+            self.animation_changed.emit({'action': 'reset'})
+    
+    def _speed_changed(self, value):
+        """Tốc độ thay đổi"""
+        speed = value / 100.0
+        self.speed_label.setText(f"{speed:.1f}x")
+        
+        if self.animation_engine:
+            self.animation_engine.set_speed(speed)
+        
+        self.animation_changed.emit({
+            'action': 'speed_change',
+            'speed': speed
+        })
+    
+    def _component_toggled(self):
+        """Thành phần được bật/tắt"""
+        components = {
+            'belt_system': self.chk_belt_system.isChecked(),
+            'drive_system': self.chk_drive_system.isChecked(),
+            'support_structure': self.chk_support_structure.isChecked(),
+            'material_flow': self.chk_material_flow.isChecked()
+        }
+        
+        self.animation_changed.emit({
+            'action': 'component_toggle',
+            'components': components
+        })
+    
+    def _camera_preset_changed(self, preset: str):
+        """Camera preset thay đổi"""
+        self.animation_changed.emit({
+            'action': 'camera_preset',
+            'preset': preset
+        })
+    
+    def _set_camera_view(self, view: str):
+        """Thiết lập góc nhìn camera"""
+        self.animation_changed.emit({
+            'action': 'camera_view',
+            'view': view
+        })
+    
+    def _material_mode_changed(self, mode: str):
+        """Chế độ chất liệu thay đổi"""
+        self.animation_changed.emit({
+            'action': 'material_mode',
+            'mode': mode
+        })
+    
+    def _opacity_changed(self, value):
+        """Độ trong suốt thay đổi"""
+        opacity = value / 100.0
+        self.opacity_label.setText(f"{value}%")
+        
+        self.animation_changed.emit({
+            'action': 'opacity_change',
+            'opacity': opacity
+        })
+    
+    def _physics_simulation_toggled(self, checked: bool):
+        """Mô phỏng vật lý được bật/tắt"""
+        self.animation_changed.emit({
+            'action': 'physics_simulation',
+            'enabled': checked
+        })
+    
+    def _particle_system_toggled(self, checked: bool):
+        """Hệ thống hạt được bật/tắt"""
+        self.animation_changed.emit({
+            'action': 'particle_system',
+            'enabled': checked
+        })
+    
+    def _shadows_toggled(self, checked: bool):
+        """Bóng đổ được bật/tắt"""
+        self.animation_changed.emit({
+            'action': 'shadows',
+            'enabled': checked
+        })
+    
+    def _antialiasing_toggled(self, checked: bool):
+        """Khử răng cưa được bật/tắt"""
+        self.animation_changed.emit({
+            'action': 'antialiasing',
+            'enabled': checked
+        })
+
+
+class InformationPanel(QWidget):
+    """Panel hiển thị thông tin"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._setup_ui()
+    
+    def _setup_ui(self):
+        """Thiết lập giao diện"""
+        layout = QVBoxLayout(self)
+        
+        # Tab widget cho các loại thông tin khác nhau
+        self.tab_widget = QTabWidget()
+        
+        # Tab thông số kỹ thuật
+        self.technical_tab = self._create_technical_tab()
+        self.tab_widget.addTab(self.technical_tab, "Thông số kỹ thuật")
+        
+        # Tab thành phần
+        self.components_tab = self._create_components_tab()
+        self.tab_widget.addTab(self.components_tab, "Thành phần")
+        
+        # Tab vật lý
+        self.physics_tab = self._create_physics_tab()
+        self.tab_widget.addTab(self.physics_tab, "Vật lý")
+        
+        # Tab animation
+        self.animation_tab = self._create_animation_tab()
+        self.tab_widget.addTab(self.animation_tab, "Animation")
+        
+        layout.addWidget(self.tab_widget)
+    
+    def _create_technical_tab(self) -> QWidget:
+        """Tạo tab thông số kỹ thuật"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        
+        # Thông số chính
+        main_group = QGroupBox("Thông số chính")
+        main_layout = QVBoxLayout(main_group)
+        
+        self.length_label = QLabel("Chiều dài: -- m")
+        main_layout.addWidget(self.length_label)
+        
+        self.width_label = QLabel("Chiều rộng: -- m")
+        main_layout.addWidget(self.width_label)
+        
+        self.height_label = QLabel("Chiều cao: -- m")
+        main_layout.addWidget(self.height_label)
+        
+        self.speed_label = QLabel("Tốc độ: -- m/s")
+        main_layout.addWidget(self.speed_label)
+        
+        self.power_label = QLabel("Công suất: -- kW")
+        main_layout.addWidget(self.power_label)
+        
+        layout.addWidget(main_group)
+        
+        # Thông số vật liệu
+        material_group = QGroupBox("Vật liệu")
+        material_layout = QVBoxLayout(material_group)
+        
+        self.material_type_label = QLabel("Loại vật liệu: --")
+        material_layout.addWidget(self.material_type_label)
+        
+        self.flow_rate_label = QLabel("Lưu lượng: -- TPH")
+        material_layout.addWidget(self.flow_rate_label)
+        
+        self.density_label = QLabel("Mật độ: -- kg/m³")
+        material_layout.addWidget(self.density_label)
+        
+        layout.addWidget(material_group)
         
         layout.addStretch()
-        return panel
+        return widget
     
-    def _create_visualization_area(self):
-        """Tạo khu vực visualization chính"""
-        area = QGroupBox("🎮 Khu vực 3D")
-        layout = QVBoxLayout(area)
+    def _create_components_tab(self) -> QWidget:
+        """Tạo tab thành phần"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
         
-        # Placeholder cho WebEngine
-        self.visualization_placeholder = QLabel("Khu vực visualization 3D\n(WebEngine sẽ được tích hợp ở đây)")
-        self.visualization_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.visualization_placeholder.setStyleSheet("""
-            QLabel {
-                background-color: #2c3e50;
-                color: white;
-                border: 2px dashed #34495e;
-                border-radius: 8px;
-                padding: 40px;
-                font-size: 16px;
-            }
-        """)
-        layout.addWidget(self.visualization_placeholder)
+        # Danh sách thành phần
+        self.components_text = QTextEdit()
+        self.components_text.setReadOnly(True)
+        self.components_text.setMaximumHeight(200)
+        layout.addWidget(QLabel("Danh sách thành phần:"))
+        layout.addWidget(self.components_text)
         
-        return area
-    
-    def _create_right_panel(self):
-        """Tạo panel bên phải với thông tin"""
-        panel = QGroupBox("📊 Thông tin")
-        layout = QVBoxLayout(panel)
+        # Thống kê
+        stats_group = QGroupBox("Thống kê")
+        stats_layout = QVBoxLayout(stats_group)
         
-        # System info
-        system_group = QGroupBox("Hệ thống")
-        system_layout = QVBoxLayout(system_group)
+        self.total_components_label = QLabel("Tổng số thành phần: --")
+        stats_layout.addWidget(self.total_components_label)
         
-        self.lbl_length = QLabel("Chiều dài: --")
-        self.lbl_width = QLabel("Chiều rộng: --")
-        self.lbl_height = QLabel("Chiều cao: --")
-        self.lbl_speed = QLabel("Tốc độ: --")
-        self.lbl_power = QLabel("Công suất: --")
+        self.belt_components_label = QLabel("Thành phần băng tải: --")
+        stats_layout.addWidget(self.belt_components_label)
         
-        system_layout.addWidget(self.lbl_length)
-        system_layout.addWidget(self.lbl_width)
-        system_layout.addWidget(self.lbl_height)
-        system_layout.addWidget(self.lbl_speed)
-        system_layout.addWidget(self.lbl_power)
+        self.drive_components_label = QLabel("Thành phần truyền động: --")
+        stats_layout.addWidget(self.drive_components_label)
         
-        layout.addWidget(system_group)
+        self.support_components_label = QLabel("Thành phần khung đỡ: --")
+        stats_layout.addWidget(self.support_components_label)
         
-        # Component info
-        component_info_group = QGroupBox("Thành phần")
-        component_info_layout = QVBoxLayout(component_info_group)
-        
-        self.lbl_belt_type = QLabel("Băng tải: --")
-        self.lbl_motor_info = QLabel("Động cơ: --")
-        self.lbl_gearbox_info = QLabel("Hộp số: --")
-        self.lbl_idler_count = QLabel("Con lăn: --")
-        
-        component_info_layout.addWidget(self.lbl_belt_type)
-        component_info_layout.addWidget(self.lbl_motor_info)
-        component_info_layout.addWidget(self.lbl_gearbox_info)
-        component_info_layout.addWidget(self.lbl_idler_count)
-        
-        layout.addWidget(component_info_group)
-        
-        # Performance info
-        performance_info_group = QGroupBox("Hiệu suất")
-        performance_info_layout = QVBoxLayout(performance_info_group)
-        
-        self.lbl_fps = QLabel("FPS: --")
-        self.lbl_triangles = QLabel("Triangles: --")
-        self.lbl_memory = QLabel("Memory: -- MB")
-        
-        performance_info_layout.addWidget(self.lbl_fps)
-        performance_info_layout.addWidget(self.lbl_triangles)
-        performance_info_layout.addWidget(self.lbl_memory)
-        
-        layout.addWidget(performance_info_group)
+        layout.addWidget(stats_group)
         
         layout.addStretch()
-        return panel
+        return widget
     
-    def _create_bottom_panel(self):
-        """Tạo panel dưới với animation controls"""
-        panel = QGroupBox("🎬 Điều khiển animation")
-        layout = QHBoxLayout(panel)
+    def _create_physics_tab(self) -> QWidget:
+        """Tạo tab vật lý"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
         
-        # Animation controls
-        self.play_pause_btn = QPushButton("⏸️ Tạm dừng")
-        self.play_pause_btn.setCheckable(True)
-        self.play_pause_btn.setChecked(True)
-        layout.addWidget(self.play_pause_btn)
+        # Lực và mô-men
+        forces_group = QGroupBox("Lực và mô-men")
+        forces_layout = QVBoxLayout(forces_group)
         
-        self.reset_btn = QPushButton("🔄 Reset")
-        layout.addWidget(self.reset_btn)
+        self.belt_tension_label = QLabel("Lực căng băng tải: -- N")
+        forces_layout.addWidget(self.belt_tension_label)
         
-        layout.addWidget(QLabel("Tốc độ:"))
+        self.motor_torque_label = QLabel("Mô-men động cơ: -- Nm")
+        forces_layout.addWidget(self.motor_torque_label)
         
-        self.speed_slider = QSlider(Qt.Orientation.Horizontal)
-        self.speed_slider.setRange(10, 300)
-        self.speed_slider.setValue(100)
-        self.speed_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
-        self.speed_slider.setTickInterval(50)
-        layout.addWidget(self.speed_slider)
+        self.output_torque_label = QLabel("Mô-men đầu ra: -- Nm")
+        forces_layout.addWidget(self.output_torque_label)
         
-        self.speed_label = QLabel("100%")
-        layout.addWidget(self.speed_label)
+        layout.addWidget(forces_group)
         
-        # Additional controls
-        self.wireframe_btn = QPushButton("📐 Wireframe")
-        self.wireframe_btn.setCheckable(True)
-        layout.addWidget(self.wireframe_btn)
+        # Hiệu suất
+        efficiency_group = QGroupBox("Hiệu suất")
+        efficiency_layout = QVBoxLayout(efficiency_group)
         
-        self.fullscreen_btn = QPushButton("⛶ Fullscreen")
-        layout.addWidget(self.fullscreen_btn)
+        self.motor_efficiency_label = QLabel("Hiệu suất động cơ: -- %")
+        efficiency_layout.addWidget(self.motor_efficiency_label)
         
-        self.export_btn = QPushButton("💾 Xuất")
-        layout.addWidget(self.export_btn)
+        self.gearbox_efficiency_label = QLabel("Hiệu suất hộp số: -- %")
+        efficiency_layout.addWidget(self.gearbox_efficiency_label)
+        
+        self.overall_efficiency_label = QLabel("Hiệu suất tổng thể: -- %")
+        efficiency_layout.addWidget(self.overall_efficiency_label)
+        
+        layout.addWidget(efficiency_group)
+        
+        # Hệ số an toàn
+        safety_group = QGroupBox("An toàn")
+        safety_layout = QVBoxLayout(safety_group)
+        
+        self.safety_factor_label = QLabel("Hệ số an toàn: --")
+        safety_layout.addWidget(self.safety_factor_label)
+        
+        self.safety_status_label = QLabel("Trạng thái: --")
+        safety_layout.addWidget(self.safety_status_label)
+        
+        layout.addWidget(safety_group)
         
         layout.addStretch()
-        return panel
+        return widget
     
-    def _setup_enhanced_features(self):
-        """Thiết lập tính năng nâng cao"""
+    def _create_animation_tab(self) -> QWidget:
+        """Tạo tab animation"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        
+        # Trạng thái animation
+        status_group = QGroupBox("Trạng thái")
+        status_layout = QVBoxLayout(status_group)
+        
+        self.animation_status_label = QLabel("Trạng thái: --")
+        status_layout.addWidget(self.animation_status_label)
+        
+        self.animation_time_label = QLabel("Thời gian: -- s")
+        status_layout.addWidget(self.animation_time_label)
+        
+        self.animation_speed_label = QLabel("Tốc độ: -- x")
+        status_layout.addWidget(self.animation_speed_label)
+        
+        layout.addWidget(status_group)
+        
+        # Thông số animation
+        params_group = QGroupBox("Thông số")
+        params_layout = QVBoxLayout(params_group)
+        
+        self.belt_animation_label = QLabel("Animation băng tải: --")
+        params_layout.addWidget(self.belt_animation_label)
+        
+        self.drive_animation_label = QLabel("Animation truyền động: --")
+        params_layout.addWidget(self.drive_animation_label)
+        
+        self.idler_animation_label = QLabel("Animation con lăn: --")
+        params_layout.addWidget(self.idler_animation_label)
+        
+        self.material_animation_label = QLabel("Animation vật liệu: --")
+        params_layout.addWidget(self.material_animation_label)
+        
+        layout.addWidget(params_group)
+        
+        layout.addStretch()
+        return widget
+    
+    def update_technical_info(self, data: Dict[str, Any]):
+        """Cập nhật thông tin kỹ thuật"""
+        if 'belt_system' in data:
+            belt_data = data['belt_system']
+            geometry = belt_data.get('geometry', {})
+            
+            self.length_label.setText(f"Chiều dài: {geometry.get('length', 0):.1f} m")
+            self.width_label.setText(f"Chiều rộng: {geometry.get('width', 0):.2f} m")
+            self.height_label.setText(f"Chiều cao: {geometry.get('thickness', 0):.3f} m")
+        
+        if 'drive_system' in data:
+            drive_data = data['drive_system']
+            motor_data = drive_data.get('motor', {})
+            
+            self.power_label.setText(f"Công suất: {motor_data.get('power_kw', 0):.1f} kW")
+        
+        if 'material_properties' in data:
+            material_data = data['material_properties']
+            
+            self.material_type_label.setText(f"Loại vật liệu: {material_data.get('name', '--')}")
+            self.flow_rate_label.setText(f"Lưu lượng: {material_data.get('flow_rate_tph', 0):.0f} TPH")
+            self.density_label.setText(f"Mật độ: {material_data.get('density_kg_m3', 0):.0f} kg/m³")
+    
+    def update_components_info(self, components_data: Dict[str, Any]):
+        """Cập nhật thông tin thành phần"""
+        # Cập nhật danh sách thành phần
+        components_text = ""
+        for comp in components_data.get('components', []):
+            components_text += f"• {comp['name']} ({comp['type']})\n"
+        
+        self.components_text.setPlainText(components_text)
+        
+        # Cập nhật thống kê
+        self.total_components_label.setText(f"Tổng số thành phần: {components_data.get('total_count', 0)}")
+        
+        systems = components_data.get('systems', {})
+        self.belt_components_label.setText(f"Thành phần băng tải: {systems.get('belt_system', {}).get('component_count', 0)}")
+        self.drive_components_label.setText(f"Thành phần truyền động: {systems.get('drive_system', {}).get('component_count', 0)}")
+        self.support_components_label.setText(f"Thành phần khung đỡ: {systems.get('support_structure', {}).get('component_count', 0)}")
+    
+    def update_physics_info(self, physics_data: Dict[str, Any]):
+        """Cập nhật thông tin vật lý"""
+        if 'simulation' in physics_data:
+            sim_data = physics_data['simulation']
+            
+            if 'belt' in sim_data:
+                self.belt_tension_label.setText(f"Lực căng băng tải: {sim_data['belt'].get('tension_n', 0):.0f} N")
+            
+            if 'drive' in sim_data:
+                self.motor_torque_label.setText(f"Mô-men động cơ: {sim_data['drive'].get('output_torque_nm', 0):.1f} Nm")
+                self.output_torque_label.setText(f"Mô-men đầu ra: {sim_data['drive'].get('output_torque_nm', 0):.1f} Nm")
+        
+        if 'summary' in physics_data:
+            summary = physics_data['summary']
+            
+            self.overall_efficiency_label.setText(f"Hiệu suất tổng thể: {summary.get('efficiency', 0) * 100:.1f} %")
+            self.safety_factor_label.setText(f"Hệ số an toàn: {summary.get('safety_factor', 0):.2f}")
+            
+            safety_factor = summary.get('safety_factor', 0)
+            if safety_factor > 2.0:
+                status = "An toàn"
+                color = "green"
+            elif safety_factor > 1.5:
+                status = "Chấp nhận được"
+                color = "orange"
+            else:
+                status = "Không an toàn"
+                color = "red"
+            
+            self.safety_status_label.setText(f"Trạng thái: {status}")
+            self.safety_status_label.setStyleSheet(f"color: {color}")
+    
+    def update_animation_info(self, animation_data: Dict[str, Any]):
+        """Cập nhật thông tin animation"""
+        if 'state' in animation_data:
+            state = animation_data['state']
+            
+            status = "Đang phát" if state.get('is_playing', False) else "Đã tạm dừng"
+            self.animation_status_label.setText(f"Trạng thái: {status}")
+            
+            self.animation_time_label.setText(f"Thời gian: {state.get('time', 0):.1f} s")
+            self.animation_speed_label.setText(f"Tốc độ: {state.get('speed', 1.0):.1f}x")
+        
+        if 'animations' in animation_data:
+            animations = animation_data['animations']
+            
+            if 'belt' in animations:
+                belt_anim = animations['belt']
+                self.belt_animation_label.setText(f"Animation băng tải: {belt_anim.get('speed', 0):.2f} m/s")
+            
+            if 'drive' in animations:
+                drive_anim = animations['drive']
+                self.drive_animation_label.setText(f"Animation truyền động: {drive_anim.get('output_rpm', 0):.0f} RPM")
+            
+            if 'idler' in animations:
+                idler_anim = animations['idler']
+                self.idler_animation_label.setText(f"Animation con lăn: {idler_anim.get('rotation_speed', 0):.2f} rad/s")
+            
+            if 'material_flow' in animations:
+                material_anim = animations['material_flow']
+                self.material_animation_label.setText(f"Animation vật liệu: {material_anim.get('flow_rate', 0):.0f} TPH")
+
+
+class EnhancedVisualization3DWidget(QWidget):
+    """Widget visualization 3D nâng cấp"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        
         # Khởi tạo các thành phần
-        self._initialize_components()
+        self.animation_engine = None
+        self.component_builder = None
+        self.physics_simulator = None
         
-        # Thiết lập default values
-        self._setup_default_values()
+        # Thiết lập giao diện
+        self._setup_ui()
+        self._setup_connections()
+        
+        # Timer để cập nhật thông tin
+        self.update_timer = QTimer()
+        self.update_timer.timeout.connect(self._update_info)
+        self.update_timer.start(100)  # Cập nhật mỗi 100ms
     
-    def _initialize_components(self):
-        """Khởi tạo các thành phần"""
-        # Component builders sẽ được khởi tạo khi có dữ liệu
-        pass
-    
-    def _setup_default_values(self):
-        """Thiết lập giá trị mặc định"""
-        # Camera preset
-        self.camera_preset_combo.setCurrentText("Tổng quan")
+    def _setup_ui(self):
+        """Thiết lập giao diện"""
+        # Layout chính
+        main_layout = QHBoxLayout(self)
         
-        # Material mode
-        self.material_combo.setCurrentText("Thực tế")
+        # Splitter để chia màn hình
+        splitter = QSplitter(Qt.Orientation.Horizontal)
         
-        # Performance settings
-        self.quality_slider.setValue(3)
-        self.chk_shadows.setChecked(True)
-        self.chk_antialiasing.setChecked(True)
+        # Panel điều khiển bên trái
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        
+        # Panel điều khiển animation
+        self.animation_panel = AnimationControlPanel()
+        left_layout.addWidget(self.animation_panel)
+        
+        # Panel thông tin
+        self.info_panel = InformationPanel()
+        left_layout.addWidget(self.info_panel)
+        
+        left_panel.setMaximumWidth(350)
+        left_panel.setMinimumWidth(300)
+        
+        # Panel visualization chính với WebEngine
+        try:
+            from PySide6.QtWebEngineWidgets import QWebEngineView
+            from PySide6.QtWebEngineCore import QWebEnginePage
+            
+            self.web_view = QWebEngineView()
+            self.web_page = QWebEnginePage()
+            self.web_view.setPage(self.web_page)
+            
+            # Thiết lập HTML mặc định
+            default_html = self._generate_default_html()
+            self.web_view.setHtml(default_html)
+            
+            self.visualization_panel = self.web_view
+            
+        except ImportError:
+            # Fallback nếu không có WebEngine
+            self.visualization_panel = QWidget()
+            self.visualization_panel.setStyleSheet("background-color: #2b2b2b;")
+            
+            temp_label = QLabel("Panel Visualization 3D\n(Cần PySide6-WebEngine để hiển thị 3D)")
+            temp_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            temp_label.setStyleSheet("color: white; font-size: 16px;")
+            
+            temp_layout = QVBoxLayout(self.visualization_panel)
+            temp_layout.addWidget(temp_label)
+        
+        # Thêm vào splitter
+        splitter.addWidget(left_panel)
+        splitter.addWidget(self.visualization_panel)
+        
+        # Thiết lập tỷ lệ splitter
+        splitter.setSizes([300, 700])
+        
+        main_layout.addWidget(splitter)
     
     def _setup_connections(self):
-        """Thiết lập các kết nối signal-slot"""
-        # Mode change
-        self.mode_combo.currentTextChanged.connect(self._on_mode_changed)
-        
-        # Component visibility
-        self.chk_belt_system.toggled.connect(self._on_component_visibility_changed)
-        self.chk_drive_system.toggled.connect(self._on_component_visibility_changed)
-        self.chk_support_structure.toggled.connect(self._on_component_visibility_changed)
-        self.chk_material_flow.toggled.connect(self._on_component_visibility_changed)
-        
-        # Material mode
-        self.material_combo.currentTextChanged.connect(self._on_material_mode_changed)
-        
-        # Camera controls
-        self.camera_preset_combo.currentTextChanged.connect(self._on_camera_preset_changed)
-        self.reset_camera_btn.clicked.connect(self._on_reset_camera)
-        
-        # Performance controls
-        self.chk_shadows.toggled.connect(self._on_shadows_toggled)
-        self.chk_antialiasing.toggled.connect(self._on_antialiasing_toggled)
-        self.quality_slider.valueChanged.connect(self._on_quality_changed)
-        
-        # Animation controls
-        self.play_pause_btn.toggled.connect(self._on_play_pause_toggled)
-        self.reset_btn.clicked.connect(self._on_reset_animation)
-        self.speed_slider.valueChanged.connect(self._on_speed_changed)
-        self.wireframe_btn.toggled.connect(self._on_wireframe_toggled)
-        self.fullscreen_btn.clicked.connect(self._on_fullscreen)
-        self.export_btn.clicked.connect(self._on_export)
-    
-    def _on_mode_changed(self, mode):
-        """Xử lý khi thay đổi chế độ"""
-        if mode == "Nâng cao":
-            self.visualization_mode = 'enhanced'
-        elif mode == "Đơn giản":
-            self.visualization_mode = 'simple'
-        elif mode == "Phân tích":
-            self.visualization_mode = 'analysis'
-        
-        self._update_visualization_mode()
-    
-    def _on_component_visibility_changed(self, checked):
-        """Xử lý khi thay đổi hiển thị thành phần"""
-        # Cập nhật visibility của các thành phần
-        self._update_component_visibility()
-    
-    def _on_material_mode_changed(self, mode):
-        """Xử lý khi thay đổi chế độ material"""
-        # Cập nhật material mode
-        self._update_material_mode(mode)
-    
-    def _on_camera_preset_changed(self, preset):
-        """Xử lý khi thay đổi camera preset"""
-        # Cập nhật camera position
-        self._update_camera_preset(preset)
-    
-    def _on_reset_camera(self):
-        """Reset camera về vị trí ban đầu"""
-        # Reset camera
-        self._reset_camera()
-    
-    def _on_shadows_toggled(self, enabled):
-        """Xử lý khi toggle shadows"""
-        # Cập nhật shadow settings
-        self._update_shadow_settings(enabled)
-    
-    def _on_antialiasing_toggled(self, enabled):
-        """Xử lý khi toggle antialiasing"""
-        # Cập nhật antialiasing settings
-        self._update_antialiasing_settings(enabled)
-    
-    def _on_quality_changed(self, quality):
-        """Xử lý khi thay đổi chất lượng"""
-        # Cập nhật quality settings
-        self._update_quality_settings(quality)
-    
-    def _on_play_pause_toggled(self, playing):
-        """Xử lý khi toggle play/pause"""
-        if playing:
-            self.play_pause_btn.setText("⏸️ Tạm dừng")
-            self.animation_state_changed.emit(True)
-        else:
-            self.play_pause_btn.setText("▶️ Phát")
-            self.animation_state_changed.emit(False)
-    
-    def _on_reset_animation(self):
-        """Reset animation"""
-        # Reset tất cả animation
-        self._reset_animation()
-    
-    def _on_speed_changed(self, speed):
-        """Xử lý khi thay đổi tốc độ"""
-        self.speed_label.setText(f"{speed}%")
-        # Cập nhật animation speed
-        self._update_animation_speed(speed / 100.0)
-    
-    def _on_wireframe_toggled(self, enabled):
-        """Xử lý khi toggle wireframe"""
-        # Cập nhật wireframe mode
-        self._update_wireframe_mode(enabled)
-    
-    def _on_fullscreen(self):
-        """Xử lý khi click fullscreen"""
-        # Toggle fullscreen
-        self._toggle_fullscreen()
-    
-    def _on_export(self):
-        """Xử lý khi export"""
-        # Export visualization
-        self._export_visualization()
+        """Thiết lập kết nối tín hiệu"""
+        self.animation_panel.animation_changed.connect(self._handle_animation_change)
     
     def update_enhanced_visualization(self, params, result):
         """Cập nhật visualization nâng cao"""
         try:
-            # Tạo mô hình 3D từ tham số
+            # Sử dụng ConveyorModelGenerator để tạo mô hình hoàn chỉnh
             self.model_generator = ConveyorModelGenerator(params, result)
             model_data = self.model_generator.generate_complete_model()
             
-            # Tạo animation engine
+            # Khởi tạo animation engine
             self.animation_engine = ConveyorAnimationEngine(model_data)
+            self.animation_panel.set_animation_engine(self.animation_engine)
             
-            # Lưu dữ liệu hiện tại
-            self.current_data = model_data
+            # Khởi tạo component builder
+            self.component_builder = ComponentBuilderManager(model_data)
             
-            # Cập nhật visualization
-            self._load_enhanced_scene(model_data)
+            # Khởi tạo physics simulator
+            self.physics_simulator = ConveyorPhysicsSimulator(model_data)
             
-            # Cập nhật thông tin hiển thị
-            self._update_display_info(model_data)
+            # Cập nhật thông tin
+            self._update_all_info(model_data)
             
-            # Emit signal
-            self.visualization_updated.emit(model_data)
+            # Cập nhật visualization 3D
+            self._update_3d_visualization(model_data)
             
         except Exception as e:
-            print(f"Lỗi khi cập nhật visualization: {e}")
-            # Fallback về chế độ đơn giản
-            self._fallback_to_simple_mode(params, result)
+            print(f"Lỗi trong update_enhanced_visualization: {e}")
+            import traceback
+            traceback.print_exc()
     
-    def _load_enhanced_scene(self, model_data):
-        """Tải scene nâng cao"""
+    def _create_model_data(self, params, result) -> Dict[str, Any]:
+        """Tạo dữ liệu mô hình từ params và result"""
+        model_data = {
+            'belt_system': {
+                'geometry': {
+                    'width': params.B_mm / 1000.0,
+                    'length': params.L_m,
+                    'thickness': getattr(params, 'belt_thickness_mm', 10) / 1000.0,
+                    'trough_angle': self._parse_trough_angle(params.trough_angle_label),
+                    'inclination': getattr(params, 'inclination_degrees', 0)
+                },
+                'material': {
+                    'type': getattr(params, 'belt_type', 'fabric_ep'),
+                    'texture': 'belt_texture'
+                }
+            },
+            'drive_system': {
+                'motor': {
+                    'power_kw': getattr(result, 'motor_power_kw', 5.5),
+                    'rpm': getattr(params, 'motor_rpm', 1450),
+                    'efficiency': getattr(params, 'motor_efficiency', 0.9)
+                },
+                'gearbox': {
+                    'ratio': getattr(result, 'transmission_solution', {}).get('gearbox_ratio', 20.0),
+                    'efficiency': getattr(params, 'gearbox_efficiency', 0.95)
+                },
+                'chain_drive': getattr(result, 'transmission_solution', {}),
+                'pulleys': {
+                    'drive_diameter': 0.4,
+                    'tail_diameter': 0.4
+                }
+            },
+            'support_structure': {
+                'carrying_idlers': {
+                    'count': max(2, int(params.L_m / getattr(params, 'carrying_idler_spacing_m', 2.0))),
+                    'spacing': getattr(params, 'carrying_idler_spacing_m', 2.0),
+                    'diameter': 0.15,
+                    'trough_angle': self._parse_trough_angle(params.trough_angle_label)
+                },
+                'return_idlers': {
+                    'count': max(2, int(params.L_m / getattr(params, 'return_idler_spacing_m', 3.0))),
+                    'spacing': getattr(params, 'return_idler_spacing_m', 3.0),
+                    'diameter': 0.12
+                }
+            },
+            'material_properties': {
+                'name': getattr(params, 'material_type', 'Than đá'),
+                'density_kg_m3': getattr(params, 'material_density_kg_m3', 1600),
+                'flow_rate_tph': getattr(params, 'Q_tph', 100),
+                'particle_size_mm': getattr(params, 'particle_size_mm', 25.0)
+            },
+            'belt_speed_mps': getattr(params, 'belt_speed_mps', 2.0)
+        }
+        
+        return model_data
+    
+    def _parse_trough_angle(self, angle_label: str) -> float:
+        """Phân tích góc máng từ label"""
         try:
-            # Chọn template dựa trên mode
-            if self.visualization_mode == 'enhanced':
-                html_template = ENHANCED_HTML_TEMPLATE
-                js_template = ENHANCED_JS_TEMPLATE
-            elif self.visualization_mode == 'simple':
-                html_template = SIMPLE_HTML_TEMPLATE
-                js_template = BASIC_JS_TEMPLATE
+            if '20°' in angle_label:
+                return 20.0
+            elif '35°' in angle_label:
+                return 35.0
+            elif '45°' in angle_label:
+                return 45.0
             else:
-                html_template = ENHANCED_HTML_TEMPLATE
-                js_template = ENHANCED_JS_TEMPLATE
-            
-            # Format template với dữ liệu
-            html_content = self._format_html_template(html_template, model_data)
-            js_content = self._format_js_template(js_template, model_data)
-            
-            # Tạo HTML hoàn chỉnh
-            complete_html = html_content.replace('{enhanced_js}', js_content)
-            
-            # Load vào WebEngine (placeholder)
-            self._load_html_content(complete_html)
-            
-        except Exception as e:
-            print(f"Lỗi khi tải scene: {e}")
+                return 0.0
+        except:
+            return 0.0
     
-    def _format_html_template(self, template, data):
-        """Format HTML template với dữ liệu"""
-        try:
-            # Extract data từ model_data
-            belt_data = data.get('belt_system', {})
-            drive_data = data.get('drive_system', {})
-            support_data = data.get('support_structure', {})
-            
-            # Format template
-            formatted = template.format(
-                length=belt_data.get('properties', {}).get('length_m', 10.0),
-                width=belt_data.get('properties', {}).get('width_m', 0.5),
-                height=belt_data.get('properties', {}).get('height_m', 1.0),
-                inclination=data.get('inclination_deg', 0.0),
-                speed=data.get('belt_speed_mps', 2.0),
-                power=drive_data.get('motor', {}).get('power_kw', 5.5),
-                ratio=drive_data.get('gearbox', {}).get('ratio', 20.0),
-                libs=self._get_threejs_libraries()
-            )
-            
-            return formatted
-            
-        except Exception as e:
-            print(f"Lỗi khi format HTML template: {e}")
-            return template
+    def _update_all_info(self, model_data: Dict[str, Any]):
+        """Cập nhật tất cả thông tin"""
+        # Cập nhật thông tin kỹ thuật
+        self.info_panel.update_technical_info(model_data)
+        
+        # Cập nhật thông tin thành phần
+        if self.component_builder:
+            components_data = self.component_builder.export_components_data()
+            self.info_panel.update_components_info(components_data)
+        
+        # Cập nhật thông tin vật lý
+        if self.physics_simulator:
+            physics_data = self.physics_simulator.export_physics_data()
+            try:
+                physics_dict = json.loads(physics_data)
+                self.info_panel.update_physics_info(physics_dict)
+            except:
+                pass
     
-    def _format_js_template(self, template, data):
-        """Format JavaScript template với dữ liệu"""
-        try:
-            # Format template với dữ liệu
-            formatted = template.replace('{data}', str(data))
-            return formatted
-            
-        except Exception as e:
-            print(f"Lỗi khi format JS template: {e}")
-            return template
+    def _update_info(self):
+        """Cập nhật thông tin theo timer"""
+        if self.animation_engine:
+            animation_data = self.animation_engine.get_animation_data()
+            self.info_panel.update_animation_info(animation_data)
     
-    def _get_threejs_libraries(self):
-        """Lấy thư viện Three.js"""
+    def _handle_animation_change(self, data: Dict[str, Any]):
+        """Xử lý thay đổi animation"""
+        action = data.get('action', '')
+        
+        if action == 'play_pause':
+            # Xử lý play/pause
+            pass
+        elif action == 'reset':
+            # Xử lý reset
+            pass
+        elif action == 'speed_change':
+            # Xử lý thay đổi tốc độ
+            pass
+        elif action == 'component_toggle':
+            # Xử lý bật/tắt thành phần
+            pass
+        elif action == 'camera_preset':
+            # Xử lý thay đổi camera preset
+            pass
+        elif action == 'material_mode':
+            # Xử lý thay đổi chế độ chất liệu
+            pass
+        
+        # Gửi tín hiệu đến WebEngine (sẽ được implement sau)
+        print(f"Animation change: {action}")
+    
+    def get_visualization_data(self) -> Dict[str, Any]:
+        """Lấy dữ liệu visualization để truyền vào WebEngine"""
+        data = {}
+        
+        if self.animation_engine:
+            data['animation'] = self.animation_engine.get_animation_data()
+        
+        if self.component_builder:
+            data['components'] = self.component_builder.export_components_data()
+        
+        if self.physics_simulator:
+            data['physics'] = self.physics_simulator.export_physics_data()
+        
+        return data
+    
+    def _generate_default_html(self) -> str:
+        """Tạo HTML mặc định cho visualization"""
         return """
-        <script src="ui/js/three.min.js"></script>
-        <script src="ui/js/GLTFLoader.js"></script>
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Conveyor 3D Visualization</title>
+            <style>
+                body { margin: 0; padding: 0; background: #2b2b2b; color: white; font-family: Arial, sans-serif; }
+                #container { width: 100%; height: 100vh; display: flex; align-items: center; justify-content: center; }
+                .loading { text-align: center; }
+                .loading h2 { color: #3b82f6; margin-bottom: 20px; }
+                .loading p { color: #9ca3af; }
+            </style>
+        </head>
+        <body>
+            <div id="container">
+                <div class="loading">
+                    <h2>🚀 Conveyor 3D Visualization</h2>
+                    <p>Đang tải mô hình 3D...</p>
+                    <p>Vui lòng chờ trong giây lát</p>
+                </div>
+            </div>
+        </body>
+        </html>
         """
     
-    def _load_html_content(self, html_content):
-        """Load HTML content vào WebEngine"""
-        # Placeholder - sẽ được tích hợp với WebEngine
-        print("Loading HTML content into WebEngine...")
-        print(f"Content length: {len(html_content)} characters")
+    def _update_3d_visualization(self, model_data: Dict[str, Any]):
+        """Cập nhật visualization 3D với dữ liệu mới"""
+        if hasattr(self, 'web_view') and self.web_view:
+            try:
+                # Tạo HTML với dữ liệu mới
+                html_content = self._generate_3d_html(model_data)
+                self.web_view.setHtml(html_content)
+            except Exception as e:
+                print(f"Lỗi cập nhật 3D visualization: {e}")
     
-    def _update_display_info(self, model_data):
-        """Cập nhật thông tin hiển thị"""
-        try:
-            belt_data = model_data.get('belt_system', {})
-            drive_data = model_data.get('drive_system', {})
-            support_data = model_data.get('support_structure', {})
+    def _generate_3d_html(self, model_data: Dict[str, Any]) -> str:
+        """Tạo HTML cho visualization 3D với dữ liệu thực"""
+        # Lấy thông tin từ model_data
+        belt_info = model_data.get('belt_system', {})
+        drive_info = model_data.get('drive_system', {})
+        support_info = model_data.get('support_structure', {})
+        
+        # Tạo HTML với Three.js
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Conveyor 3D - Enhanced</title>
+            <style>
+                body {{ margin: 0; padding: 0; background: #1a1a1a; color: white; font-family: 'Segoe UI', sans-serif; }}
+                #container {{ width: 100%; height: 100vh; }}
+                #info-panel {{ 
+                    position: absolute; top: 20px; left: 20px; 
+                    background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px;
+                    max-width: 300px; z-index: 100;
+                }}
+                .info-item {{ margin: 10px 0; }}
+                .info-label {{ color: #9ca3af; font-size: 12px; }}
+                .info-value {{ color: #3b82f6; font-weight: bold; font-size: 14px; }}
+                #controls {{ 
+                    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+                    background: rgba(0,0,0,0.8); padding: 15px; border-radius: 20px;
+                    z-index: 100;
+                }}
+                .control-btn {{ 
+                    background: #3b82f6; color: white; border: none; padding: 8px 16px;
+                    border-radius: 20px; margin: 0 5px; cursor: pointer;
+                }}
+                .control-btn:hover {{ background: #2563eb; }}
+            </style>
+        </head>
+        <body>
+            <div id="container">
+                <div id="info-panel">
+                    <h3>📊 Thông tin Băng tải</h3>
+                    <div class="info-item">
+                        <div class="info-label">Chiều dài:</div>
+                        <div class="info-value">{belt_info.get('geometry', {}).get('length', 0):.1f} m</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Chiều rộng:</div>
+                        <div class="info-value">{belt_info.get('geometry', {}).get('width', 0):.2f} m</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Góc máng:</div>
+                        <div class="info-value">{belt_info.get('geometry', {}).get('trough_angle', 0):.0f}°</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Tốc độ:</div>
+                        <div class="info-value">{model_data.get('belt_speed_mps', 0):.2f} m/s</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Công suất:</div>
+                        <div class="info-value">{drive_info.get('motor', {}).get('power_kw', 0):.1f} kW</div>
+                    </div>
+                </div>
+                
+                <div id="controls">
+                    <button class="control-btn" onclick="toggleAnimation()">⏸️ Tạm dừng</button>
+                    <button class="control-btn" onclick="resetView()">🔄 Đặt lại</button>
+                    <button class="control-btn" onclick="toggleWireframe()">🔲 Wireframe</button>
+                </div>
+            </div>
             
-            # Cập nhật thông tin hệ thống
-            self.lbl_length.setText(f"Chiều dài: {belt_data.get('properties', {}).get('length_m', 0):.1f} m")
-            self.lbl_width.setText(f"Chiều rộng: {belt_data.get('properties', {}).get('width_m', 0):.2f} m")
-            self.lbl_height.setText(f"Chiều cao: {belt_data.get('properties', {}).get('height_m', 0):.1f} m")
-            self.lbl_speed.setText(f"Tốc độ: {model_data.get('belt_speed_mps', 0):.2f} m/s")
-            self.lbl_power.setText(f"Công suất: {drive_data.get('motor', {}).get('power_kw', 0):.1f} kW")
-            
-            # Cập nhật thông tin thành phần
-            self.lbl_belt_type.setText(f"Băng tải: {belt_data.get('properties', {}).get('belt_type', 'EP')}")
-            self.lbl_motor_info.setText(f"Động cơ: {drive_data.get('motor', {}).get('power_kw', 0):.1f} kW")
-            self.lbl_gearbox_info.setText(f"Hộp số: {drive_data.get('gearbox', {}).get('ratio', 0):.1f}")
-            self.lbl_idler_count.setText(f"Con lăn: {support_data.get('properties', {}).get('total_carrying_idlers', 0)}")
-            
-        except Exception as e:
-            print(f"Lỗi khi cập nhật thông tin hiển thị: {e}")
-    
-    def _fallback_to_simple_mode(self, params, result):
-        """Fallback về chế độ đơn giản"""
-        print("Fallback về chế độ đơn giản...")
-        # Implement fallback logic
-    
-    def _update_visualization_mode(self):
-        """Cập nhật chế độ visualization"""
-        if hasattr(self, 'current_data') and self.current_data:
-            self._load_enhanced_scene(self.current_data)
-    
-    def _update_component_visibility(self):
-        """Cập nhật visibility của các thành phần"""
-        # Implement component visibility update
-        pass
-    
-    def _update_material_mode(self, mode):
-        """Cập nhật material mode"""
-        # Implement material mode update
-        pass
-    
-    def _update_camera_preset(self, preset):
-        """Cập nhật camera preset"""
-        # Implement camera preset update
-        pass
-    
-    def _reset_camera(self):
-        """Reset camera"""
-        # Implement camera reset
-        pass
-    
-    def _update_shadow_settings(self, enabled):
-        """Cập nhật shadow settings"""
-        # Implement shadow settings update
-        pass
-    
-    def _update_antialiasing_settings(self, enabled):
-        """Cập nhật antialiasing settings"""
-        # Implement antialiasing settings update
-        pass
-    
-    def _update_quality_settings(self, quality):
-        """Cập nhật quality settings"""
-        # Implement quality settings update
-        pass
-    
-    def _reset_animation(self):
-        """Reset animation"""
-        # Implement animation reset
-        pass
-    
-    def _update_animation_speed(self, speed):
-        """Cập nhật animation speed"""
-        # Implement animation speed update
-        pass
-    
-    def _update_wireframe_mode(self, enabled):
-        """Cập nhật wireframe mode"""
-        # Implement wireframe mode update
-        pass
-    
-    def _toggle_fullscreen(self):
-        """Toggle fullscreen"""
-        # Implement fullscreen toggle
-        pass
-    
-    def _export_visualization(self):
-        """Export visualization"""
-        # Implement export functionality
-        pass
-    
-    def _update_performance_info(self):
-        """Cập nhật thông tin hiệu suất"""
-        # Placeholder - sẽ được cập nhật từ WebEngine
-        self.lbl_fps.setText("FPS: 60")
-        self.lbl_triangles.setText("Triangles: 1,234")
-        self.lbl_memory.setText("Memory: 45 MB")
-    
-    def get_visualization_data(self):
-        """Lấy dữ liệu visualization hiện tại"""
-        return self.current_data
-    
-    def set_visualization_mode(self, mode):
-        """Thiết lập chế độ visualization"""
-        self.mode_combo.setCurrentText(mode)
-    
-    def toggle_animation(self, playing):
-        """Toggle animation"""
-        self.play_pause_btn.setChecked(playing)
-    
-    def set_animation_speed(self, speed):
-        """Thiết lập tốc độ animation (0.1 - 3.0)"""
-        speed_percent = int(speed * 100)
-        self.speed_slider.setValue(speed_percent)
-    
-    def highlight_component(self, component_type):
-        """Highlight thành phần được chọn"""
-        self.component_selected.emit(component_type)
-    
-    def refresh_visualization(self):
-        """Refresh visualization"""
-        if hasattr(self, 'current_data') and self.current_data:
-            self._load_enhanced_scene(self.current_data)
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+            <script>
+                // Three.js visualization code sẽ được thêm ở đây
+                let scene, camera, renderer, conveyor;
+                let isAnimating = true;
+                
+                function init() {{
+                    // Thiết lập scene
+                    scene = new THREE.Scene();
+                    scene.background = new THREE.Color(0x1a1a1a);
+                    
+                    // Thiết lập camera
+                    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                    camera.position.set(10, 5, 10);
+                    camera.lookAt(0, 0, 0);
+                    
+                    // Thiết lập renderer
+                    renderer = new THREE.WebGLRenderer({{ antialias: true }});
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                    renderer.shadowMap.enabled = true;
+                    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                    
+                    document.getElementById('container').appendChild(renderer.domElement);
+                    
+                    // Tạo băng tải
+                    createConveyor();
+                    
+                    // Thiết lập lighting
+                    setupLighting();
+                    
+                    // Animation loop
+                    animate();
+                    
+                    // Xử lý resize
+                    window.addEventListener('resize', onWindowResize, false);
+                }}
+                
+                function createConveyor() {{
+                    // Tạo băng tải chính
+                    const beltGeometry = new THREE.BoxGeometry(
+                        {belt_info.get('geometry', {}).get('length', 10)}, 
+                        {belt_info.get('geometry', {}).get('thickness', 0.01)}, 
+                        {belt_info.get('geometry', {}).get('width', 0.8)}
+                    );
+                    const beltMaterial = new THREE.MeshLambertMaterial({{ color: 0x2563eb }});
+                    conveyor = new THREE.Mesh(beltGeometry, beltMaterial);
+                    conveyor.position.y = 0.5;
+                    scene.add(conveyor);
+                    
+                    // Tạo con lăn
+                    createIdlers();
+                    
+                    // Tạo khung đỡ
+                    createSupportStructure();
+                }}
+                
+                function createIdlers() {{
+                    const idlerCount = {support_info.get('carrying_idlers', {}).get('count', 5)};
+                    const spacing = {support_info.get('carrying_idlers', {}).get('spacing', 2.0)};
+                    const diameter = {support_info.get('carrying_idlers', {}).get('diameter', 0.15)};
+                    
+                    for (let i = 0; i < idlerCount; i++) {{
+                        const idlerGeometry = new THREE.CylinderGeometry(diameter/2, diameter/2, {belt_info.get('geometry', {}).get('width', 0.8)}, 8);
+                        const idlerMaterial = new THREE.MeshLambertMaterial({{ color: 0x6b7280 }});
+                        const idler = new THREE.Mesh(idlerGeometry, idlerMaterial);
+                        
+                        idler.rotation.z = Math.PI / 2;
+                        idler.position.x = (i - idlerCount/2) * spacing;
+                        idler.position.y = diameter/2;
+                        
+                        scene.add(idler);
+                    }}
+                }}
+                
+                function createSupportStructure() {{
+                    const length = {belt_info.get('geometry', {}).get('length', 10)};
+                    const width = {belt_info.get('geometry', {}).get('width', 0.8)};
+                    
+                    // Tạo khung đỡ
+                    const frameGeometry = new THREE.BoxGeometry(length, 0.1, 0.1);
+                    const frameMaterial = new THREE.MeshLambertMaterial({{ color: 0x374151 }});
+                    
+                    // Khung dọc
+                    const leftFrame = new THREE.Mesh(frameGeometry, frameMaterial);
+                    leftFrame.position.set(0, 0.05, -width/2 - 0.05);
+                    scene.add(leftFrame);
+                    
+                    const rightFrame = new THREE.Mesh(frameGeometry, frameMaterial);
+                    rightFrame.position.set(0, 0.05, width/2 + 0.05);
+                    scene.add(rightFrame);
+                    
+                    // Khung ngang
+                    const crossFrameGeometry = new THREE.BoxGeometry(0.1, 0.1, width + 0.2);
+                    const crossFrame = new THREE.Mesh(crossFrameGeometry, frameMaterial);
+                    crossFrame.position.set(0, 0.05, 0);
+                    scene.add(crossFrame);
+                }}
+                
+                function setupLighting() {{
+                    // Ambient light
+                    const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+                    scene.add(ambientLight);
+                    
+                    // Directional light
+                    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                    directionalLight.position.set(10, 10, 5);
+                    directionalLight.castShadow = true;
+                    directionalLight.shadow.mapSize.width = 2048;
+                    directionalLight.shadow.mapSize.height = 2048;
+                    scene.add(directionalLight);
+                }}
+                
+                function animate() {{
+                    requestAnimationFrame(animate);
+                    
+                    if (isAnimating) {{
+                        // Animation cho băng tải
+                        if (conveyor) {{
+                            conveyor.rotation.y += 0.01;
+                        }}
+                    }}
+                    
+                    renderer.render(scene, camera);
+                }}
+                
+                function toggleAnimation() {{
+                    isAnimating = !isAnimating;
+                    const btn = event.target;
+                    btn.textContent = isAnimating ? '⏸️ Tạm dừng' : '▶️ Phát';
+                }}
+                
+                function resetView() {{
+                    camera.position.set(10, 5, 10);
+                    camera.lookAt(0, 0, 0);
+                }}
+                
+                function toggleWireframe() {{
+                    if (conveyor) {{
+                        conveyor.material.wireframe = !conveyor.material.wireframe;
+                    }}
+                }}
+                
+                function onWindowResize() {{
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                }}
+                
+                // Khởi tạo khi trang load xong
+                window.addEventListener('load', init);
+            </script>
+        </body>
+        </html>
+        """
+        
+        return html

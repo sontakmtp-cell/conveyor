@@ -1,0 +1,99 @@
+{
+  "summary": {
+    "total_tests": 6,
+    "passed_tests": 6,
+    "failed_tests": 0,
+    "success_rate": 100.0
+  },
+  "performance_metrics": {
+    "average_execution_time": 0.01347664992014567,
+    "total_execution_time": 0.08085989952087402,
+    "fastest_test": 0.00011730194091796875,
+    "slowest_test": 0.07769012451171875
+  },
+  "test_results": [
+    {
+      "name": "Core System Integration Test",
+      "status": "PASSED",
+      "execution_time": 0.00011730194091796875,
+      "test_cases_processed": 3,
+      "model_generation_success": true
+    },
+    {
+      "name": "Visualization Integration Test",
+      "status": "PASSED",
+      "execution_time": 0.0008928775787353516,
+      "components_created": 207,
+      "animations_created": 3,
+      "physics_components": 3,
+      "optimization_success": true
+    },
+    {
+      "name": "Data Flow Integration Test",
+      "status": "PASSED",
+      "execution_time": 0.0016188621520996094,
+      "test_cases_processed": 3,
+      "total_components": 763,
+      "total_animations": 9,
+      "total_physics": 9,
+      "data_consistency": true
+    },
+    {
+      "name": "Performance Integration Test",
+      "status": "PASSED",
+      "execution_time": 0.0003752708435058594,
+      "optimization_levels_tested": 4,
+      "auto_optimization_success": true,
+      "memory_management_working": true,
+      "optimization_results": {
+        "low": {
+          "optimization_time": 1.3589859008789062e-05,
+          "size_reduction": 1240,
+          "reduction_percent": 67.17226435536294
+        },
+        "medium": {
+          "optimization_time": 5.9604644775390625e-06,
+          "size_reduction": 1237,
+          "reduction_percent": 67.00975081256772
+        },
+        "high": {
+          "optimization_time": 5.0067901611328125e-06,
+          "size_reduction": 1239,
+          "reduction_percent": 67.11809317443121
+        },
+        "ultra": {
+          "optimization_time": 4.291534423828125e-06,
+          "size_reduction": 1238,
+          "reduction_percent": 67.06392199349945
+        }
+      }
+    },
+    {
+      "name": "Error Handling Integration Test",
+      "status": "PASSED",
+      "execution_time": 0.00016546249389648438,
+      "invalid_data_handled": true,
+      "error_handling_robust": true
+    },
+    {
+      "name": "Memory Integration Test",
+      "status": "PASSED",
+      "execution_time": 0.07769012451171875,
+      "instances_created": 5,
+      "memory_cleanup_success": true,
+      "objects_cleaned": 8931,
+      "optimizer_memory_management": true
+    }
+  ],
+  "analysis": {
+    "core_system_integration": true,
+    "visualization_integration": true,
+    "data_flow_integration": true,
+    "performance_integration": true,
+    "error_handling_integration": true,
+    "memory_integration": true
+  },
+  "recommendations": [
+    "Tất cả integration tests đều pass, hệ thống hoạt động tốt"
+  ]
+}

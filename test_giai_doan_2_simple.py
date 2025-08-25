@@ -233,18 +233,16 @@ def test_template_integration():
             speed=test_data['belt_speed_mps'],
             power=test_data['drive_system']['motor']['power_kw'],
             ratio=test_data['drive_system']['gearbox']['ratio'],
-            libs="<!-- Three.js libraries -->"
+            libs="<!-- Three.js libraries -->",
+            js_code=ENHANCED_JS_TEMPLATE
         )
         
-        # Test integration
-        complete_html = formatted_html.replace('{enhanced_js}', ENHANCED_JS_TEMPLATE)
-        
-        assert len(complete_html) > 15000
-        assert "Băng tải 3D nâng cao" in complete_html
-        assert "EnhancedConveyorVisualization" in complete_html
+        assert len(formatted_html) > 15000
+        assert "Băng tải 3D nâng cao" in formatted_html
+        assert "EnhancedConveyorVisualization" in formatted_html
         
         print(f"✅ Template integration test passed")
-        print(f"   - Complete HTML length: {len(complete_html)} chars")
+        print(f"   - Complete HTML length: {len(formatted_html)} chars")
         print(f"   - HTML content verified")
         print(f"   - JavaScript integration verified")
         

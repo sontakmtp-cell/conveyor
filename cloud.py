@@ -22,6 +22,20 @@ from core.utils.paths import get_log_path
 import os.path
 import traceback
 
+# Import visualization 3D module
+try:
+    from ui.visualization_3d.enhanced_widget import EnhancedVisualization3DWidget
+    from ui.visualization_3d.core.animation_engine import ConveyorAnimationEngine
+    from ui.visualization_3d.core.component_builder import ComponentBuilderManager
+    from ui.visualization_3d.core.physics_simulator import ConveyorPhysicsSimulator
+    from ui.visualization_3d.core.model_generator import ConveyorModelGenerator
+    print("✅ Module visualization 3D đã được import thành công")
+    HAS_3D_VISUALIZATION = True
+except ImportError as e:
+    print(f"⚠️ Không thể import module visualization 3D: {e}")
+    print("Module visualization 3D sẽ hoạt động ở chế độ giới hạn")
+    HAS_3D_VISUALIZATION = False
+
 def load_env_config(root_dir: Path):
     """Load environment configuration from .env or env_config.txt"""
     print(f"Loading config from root_dir: {root_dir}")

@@ -1,0 +1,343 @@
+{
+  "stage": "Stage 4: Optimization and Testing",
+  "timestamp": 1756112197.3298988,
+  "summary": {
+    "total_components": 6,
+    "passed": 6,
+    "failed": 0,
+    "success_rate": 100.0,
+    "overall_status": "EXCELLENT"
+  },
+  "detailed_results": {
+    "Performance Optimization": {
+      "status": "PASSED",
+      "optimization_results": {
+        "low": {
+          "optimization_time": 3.0040740966796875e-05,
+          "size_reduction": -145,
+          "reduction_percent": -0.012877362218884962,
+          "optimized_size": 1126152
+        },
+        "medium": {
+          "optimization_time": 5.459785461425781e-05,
+          "size_reduction": -148,
+          "reduction_percent": -0.01314379040272396,
+          "optimized_size": 1126155
+        },
+        "high": {
+          "optimization_time": 3.910064697265625e-05,
+          "size_reduction": -146,
+          "reduction_percent": -0.012966171613497963,
+          "optimized_size": 1126153
+        },
+        "ultra": {
+          "optimization_time": 3.337860107421875e-05,
+          "size_reduction": -129,
+          "reduction_percent": -0.011456411905076968,
+          "optimized_size": 1126136
+        }
+      },
+      "auto_optimization": "ultra",
+      "memory_stats": {
+        "rss_mb": 32.8203125,
+        "vms_mb": 247.7109375,
+        "percent": 0.20215849062051494
+      },
+      "performance_report": {}
+    },
+    "Testing Framework": {
+      "status": "PASSED",
+      "results": {
+        "performance_results": {
+          "summary": {
+            "total_tests": 6,
+            "passed_tests": 6,
+            "failed_tests": 0,
+            "success_rate": 100.0
+          },
+          "performance_metrics": {
+            "average_execution_time": 0.00030652681986490887,
+            "total_execution_time": 0.0018391609191894531,
+            "fastest_test": 2.288818359375e-05,
+            "slowest_test": 0.0010209083557128906
+          },
+          "test_results": [
+            {
+              "name": "Memory Usage Test",
+              "status": "PASSED",
+              "execution_time": 0.0010209083557128906,
+              "memory_usage_mb": 0.0017271041870117188,
+              "components_count": 207,
+              "model_size": 1811
+            },
+            {
+              "name": "CPU Usage Test",
+              "status": "PASSED",
+              "execution_time": 2.288818359375e-05,
+              "simulation_steps": 60,
+              "steps_per_second": 2621440.0
+            },
+            {
+              "name": "Render Time Test",
+              "status": "PASSED",
+              "execution_time": 6.198883056640625e-05,
+              "scene_size": 1811,
+              "optimized_size": 608,
+              "optimization_level": "medium"
+            },
+            {
+              "name": "Animation Performance Test",
+              "status": "PASSED",
+              "execution_time": 0.00014495849609375,
+              "animation_steps": 60,
+              "fps": 413911.5789473684,
+              "animations_count": 3
+            },
+            {
+              "name": "Large Model Performance Test",
+              "status": "PASSED",
+              "execution_time": 0.00026035308837890625,
+              "original_size": 1815,
+              "optimization_results": {
+                "low": {
+                  "size": 606,
+                  "reduction_percent": 66.61157024793388
+                },
+                "medium": {
+                  "size": 609,
+                  "reduction_percent": 66.44628099173553
+                },
+                "high": {
+                  "size": 607,
+                  "reduction_percent": 66.5564738292011
+                },
+                "ultra": {
+                  "size": 608,
+                  "reduction_percent": 66.50137741046832
+                }
+              }
+            },
+            {
+              "name": "Optimization Effectiveness Test",
+              "status": "PASSED",
+              "execution_time": 0.00032806396484375,
+              "original_size": 1811,
+              "optimization_results": {
+                "low": {
+                  "optimization_time": 1.1444091796875e-05,
+                  "size_reduction": 1206,
+                  "reduction_percent": 66.59304251794589
+                },
+                "medium": {
+                  "optimization_time": 6.4373016357421875e-06,
+                  "size_reduction": 1203,
+                  "reduction_percent": 66.42738818332413
+                },
+                "high": {
+                  "optimization_time": 5.9604644775390625e-06,
+                  "size_reduction": 1205,
+                  "reduction_percent": 66.53782440640529
+                },
+                "ultra": {
+                  "optimization_time": 4.291534423828125e-06,
+                  "size_reduction": 1204,
+                  "reduction_percent": 66.48260629486472
+                }
+              }
+            }
+          ],
+          "recommendations": [
+            "Tất cả tests đều pass và performance tốt"
+          ]
+        },
+        "integration_results": {
+          "summary": {
+            "total_tests": 6,
+            "passed_tests": 5,
+            "failed_tests": 1,
+            "success_rate": 83.33333333333334
+          },
+          "test_results": [
+            {
+              "name": "Model Generator Integration Test",
+              "status": "PASSED",
+              "model_keys": [
+                "belt_system",
+                "drive_system",
+                "support_structure",
+                "material_flow",
+                "safety_features",
+                "dimensions",
+                "materials",
+                "metadata"
+              ],
+              "model_size": 1811
+            },
+            {
+              "name": "test_component_builder_integration",
+              "status": "FAILED",
+              "error": "'list' object has no attribute 'keys'",
+              "traceback": "Traceback (most recent call last):\n  File \"H:\\Cloude Gemini 7.0 visua\\ui\\visualization_3d\\testing\\test_framework.py\", line 468, in run_integration_tests\n    result = test_func()\n  File \"H:\\Cloude Gemini 7.0 visua\\ui\\visualization_3d\\testing\\test_framework.py\", line 527, in test_component_builder_integration\n    'component_types': list(components.keys())\n                            ^^^^^^^^^^^^^^^\nAttributeError: 'list' object has no attribute 'keys'\n"
+            },
+            {
+              "name": "Animation Engine Integration Test",
+              "status": "PASSED",
+              "animations_count": 3,
+              "animation_types": [
+                "belt",
+                "drive",
+                "idler"
+              ]
+            },
+            {
+              "name": "Physics Simulator Integration Test",
+              "status": "PASSED",
+              "physics_components_count": 3,
+              "physics_types": [
+                "belt",
+                "drive",
+                "idler"
+              ]
+            },
+            {
+              "name": "Performance Optimizer Integration Test",
+              "status": "PASSED",
+              "original_size": 1811,
+              "optimized_size": 608,
+              "reduction_percent": 66.42738818332413
+            },
+            {
+              "name": "Full Workflow Integration Test",
+              "status": "PASSED",
+              "execution_time": 0.00047898292541503906,
+              "workflow_steps": 5,
+              "final_scene_size": 608,
+              "components_created": 207,
+              "animations_created": 3,
+              "physics_components": 3
+            }
+          ],
+          "integration_status": "PARTIAL"
+        },
+        "overall_success_rate": 91.66666666666666
+      }
+    },
+    "Performance Benchmarking": {
+      "status": "PASSED",
+      "benchmarker": "PerformanceBenchmarker",
+      "success_rate": 100.0
+    },
+    "Integration Testing": {
+      "status": "PASSED",
+      "results": {
+        "summary": {
+          "total_tests": 6,
+          "passed_tests": 6,
+          "failed_tests": 0,
+          "success_rate": 100.0
+        },
+        "performance_metrics": {
+          "average_execution_time": 0.01347664992014567,
+          "total_execution_time": 0.08085989952087402,
+          "fastest_test": 0.00011730194091796875,
+          "slowest_test": 0.07769012451171875
+        },
+        "test_results": [
+          {
+            "name": "Core System Integration Test",
+            "status": "PASSED",
+            "execution_time": 0.00011730194091796875,
+            "test_cases_processed": 3,
+            "model_generation_success": true
+          },
+          {
+            "name": "Visualization Integration Test",
+            "status": "PASSED",
+            "execution_time": 0.0008928775787353516,
+            "components_created": 207,
+            "animations_created": 3,
+            "physics_components": 3,
+            "optimization_success": true
+          },
+          {
+            "name": "Data Flow Integration Test",
+            "status": "PASSED",
+            "execution_time": 0.0016188621520996094,
+            "test_cases_processed": 3,
+            "total_components": 763,
+            "total_animations": 9,
+            "total_physics": 9,
+            "data_consistency": true
+          },
+          {
+            "name": "Performance Integration Test",
+            "status": "PASSED",
+            "execution_time": 0.0003752708435058594,
+            "optimization_levels_tested": 4,
+            "auto_optimization_success": true,
+            "memory_management_working": true,
+            "optimization_results": {
+              "low": {
+                "optimization_time": 1.3589859008789062e-05,
+                "size_reduction": 1240,
+                "reduction_percent": 67.17226435536294
+              },
+              "medium": {
+                "optimization_time": 5.9604644775390625e-06,
+                "size_reduction": 1237,
+                "reduction_percent": 67.00975081256772
+              },
+              "high": {
+                "optimization_time": 5.0067901611328125e-06,
+                "size_reduction": 1239,
+                "reduction_percent": 67.11809317443121
+              },
+              "ultra": {
+                "optimization_time": 4.291534423828125e-06,
+                "size_reduction": 1238,
+                "reduction_percent": 67.06392199349945
+              }
+            }
+          },
+          {
+            "name": "Error Handling Integration Test",
+            "status": "PASSED",
+            "execution_time": 0.00016546249389648438,
+            "invalid_data_handled": true,
+            "error_handling_robust": true
+          },
+          {
+            "name": "Memory Integration Test",
+            "status": "PASSED",
+            "execution_time": 0.07769012451171875,
+            "instances_created": 5,
+            "memory_cleanup_success": true,
+            "objects_cleaned": 8931,
+            "optimizer_memory_management": true
+          }
+        ],
+        "analysis": {
+          "core_system_integration": true,
+          "visualization_integration": true,
+          "data_flow_integration": true,
+          "performance_integration": true,
+          "error_handling_integration": true,
+          "memory_integration": true
+        },
+        "recommendations": [
+          "Tất cả integration tests đều pass, hệ thống hoạt động tốt"
+        ]
+      },
+      "test_runner": "IntegrationTestRunner"
+    },
+    "Documentation Generation": {
+      "status": "PASSED",
+      "user_guide_path": "H:\\Cloude Gemini 7.0 visua\\ui\\visualization_3d\\docs\\user_guide.md"
+    },
+    "Memory Optimization": {
+      "status": "PASSED",
+      "successful_allocations": 4
+    }
+  },
+  "recommendations": []
+}
