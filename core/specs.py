@@ -55,6 +55,15 @@ BELT_SPECS = {
 ACTIVE_MATERIAL_DB = MATERIAL_DB.copy()
 ACTIVE_BELT_SPECS = BELT_SPECS.copy()
 
+# Kiểm tra và đảm bảo ACTIVE_MATERIAL_DB không trống
+if not ACTIVE_MATERIAL_DB:
+    print("Warning: ACTIVE_MATERIAL_DB is empty, using fallback data")
+    ACTIVE_MATERIAL_DB = {
+        "Than đá": {"density": 0.9, "angle_repose": 35, "v_max": 5.0, "abrasive": "medium", "temperature_max": 80, "moisture": "low", "corrosive": False},
+        "Cát khô": {"density": 1.56, "angle_repose": 20, "v_max": 3.0, "abrasive": "high", "temperature_max": 60, "moisture": "very_low", "corrosive": False},
+        "Đá vôi": {"density": 1.56, "angle_repose": 30, "v_max": 3.0, "abrasive": "medium", "temperature_max": 90, "moisture": "low", "corrosive": False}
+    }
+
 # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
 # Danh sách tỉ số truyền tiêu chuẩn của hộp số giảm tốc
 # Sắp xếp theo thứ tự giảm dần để ưu tiên chi phí (tỷ số cao thường ít cấp hơn, rẻ hơn)
@@ -67,6 +76,11 @@ PREFERRED_CHAIN_RATIO = 1.9
 PREFERRED_CHAIN_RANGE = (1.6, 2.2)
 CHAIN_WEIGHT_IMPORTANCE = 0.1
 # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
+
+# --- [BẮT ĐẦU NÂNG CẤP TỐC ĐỘ BĂNG TỰ ĐỘNG] ---
+# Hằng số an toàn cho tốc độ băng
+BELT_SPEED_SAFETY_MARGIN = 0.15  # 15% margin so với tốc độ khuyến nghị
+# --- [KẾT THÚC NÂNG CẤP TỐC ĐỘ BĂNG TỰ ĐỘNG] ---
 
 # Hằng số an toàn cho xích (dùng trong kiểm tra độ bền) - ĐIỀU CHỈNH XUỐNG MỨC HỢP LÝ
 CHAIN_TENSILE_STRENGTH_SAFETY_FACTOR = 4

@@ -197,7 +197,7 @@ class ProfessionalPDFExporter(FPDF):
     def draw_executive_summary(self):
         """Mục 1: Tóm tắt cho Lãnh đạo."""
         self.add_page()
-        self._draw_section_title("1. TÓM TẮT DÀNH CHO LÃNH ĐẠO")
+        self._draw_section_title("1. TÓM TẮT DỰ ÁN")
         
         summary_text = (
             "Báo cáo này trình bày các kết quả tính toán và đề xuất kỹ thuật cho hệ thống băng tải dựa trên các thông số thiết kế đã cung cấp. "
@@ -302,65 +302,7 @@ class ProfessionalPDFExporter(FPDF):
         
         r = self.result
         
-        # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
-        # Thông số bộ truyền động hoàn chỉnh
-        if hasattr(r, 'transmission_solution') and r.transmission_solution:
-            self.set_font("DejaVu", "B", 11)
-            self.set_text_color(*COLOR_PRIMARY)
-            self.cell(0, 10, "BỘ TRUYỀN ĐỘNG HOÀN CHỈNH", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            self.ln(2)
-            
-            t = r.transmission_solution
-            # Hiển thị mã xích với cả tiêu chuẩn ANSI và ISO theo định dạng rõ ràng
-            chain_display = t.chain_designation
-            if hasattr(t, 'chain_spec') and t.chain_spec:
-                ansi_code = t.chain_spec.ansi_code or ""
-                iso_code = t.chain_spec.iso_code or ""
-                if ansi_code and iso_code:
-                    # Hiển thị theo định dạng: 25/05B (ANSI/ISO)
-                    chain_display = f"{ansi_code}/{iso_code} (ANSI/ISO)"
-                elif ansi_code:
-                    chain_display = f"{ansi_code} (ANSI)"
-                elif iso_code:
-                    chain_display = f"{iso_code} (ISO)"
-            elif '/' in chain_display and chain_display.endswith(' (ANSI/ISO)'):
-                # Xử lý format mới: "25/05B (ANSI/ISO)"
-                chain_display = chain_display  # Giữ nguyên format
-            elif '/' in chain_display:
-                # Nếu chain_designation có dạng "25/05B", hiển thị rõ ràng
-                ansi_part, iso_part = chain_display.split('/', 1)
-                chain_display = f"{ansi_part}/{iso_part} (ANSI/ISO)"
-            elif chain_display.endswith(' (ANSI)'):
-                # Xử lý format mới: "25 (ANSI)"
-                chain_display = chain_display  # Giữ nguyên format
-            elif chain_display.endswith(' (ISO)'):
-                # Xử lý format mới: "05B (ISO)"
-                chain_display = chain_display  # Giữ nguyên format
-            
-            transmission_data = {
-                "Hộp số giảm tốc (tỉ số truyền)": f"{t.gearbox_ratio}",
-                "Bộ truyền nhông-xích": f"{t.drive_sprocket_teeth} răng → {t.driven_sprocket_teeth} răng",
-                "Mã xích (ANSI/ISO)": f"{chain_display} ({t.chain_pitch_mm} mm)",
-                "Tổng tỉ số truyền": f"{t.total_transmission_ratio:.2f}",
-                "Vận tốc thực tế": f"{t.actual_belt_velocity:.3f} m/s",
-                "Sai số so với yêu cầu": f"{t.error:.2f}%",
-                # --- [BẮT ĐẦU NÂNG CẤP THEO KẾ HOẠCH] ---
-                "Lực kéo yêu cầu": f"{t.required_force_kN:.2f} kN",
-                "Lực kéo cho phép": f"{t.allowable_kN:.2f} kN",
-                "Hệ số an toàn": f"{t.safety_margin:.2f}",
-                "Trọng lượng xích": f"{t.chain_weight_kgpm:.3f} kg/m"
-                # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
-            }
-            
-            self.set_font("DejaVu", "", 10)
-            for key, value in transmission_data.items():
-                self.set_fill_color(*COLOR_LIGHT_GREY)
-                self.cell(80, 8, f" {key}", border=1, fill=True)
-                self.set_text_color(0,0,0)
-                self.multi_cell(100, 8, f" {value}", border=1, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            
-            self.ln(5)
-        # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
+
         
         # Phân tích
         self.set_font("DejaVu", "B", 11)
@@ -409,7 +351,7 @@ class ProfessionalPDFExporter(FPDF):
     def draw_cost_analysis(self):
         """Mục 5: Phân tích Chi phí."""
         self.add_page()
-        self._draw_section_title("5. PHÂN TÍCH CHI PHÍ (ƯỚC TÍNH)")
+        self._draw_section_title("6. PHÂN TÍCH CHI PHÍ (ƯỚC TÍNH)")
         
         r = self.result
         capex_data = {
@@ -433,7 +375,7 @@ class ProfessionalPDFExporter(FPDF):
     def draw_structural_recommendations(self):
         """Mục 6: Đề xuất Cấu trúc."""
         self.add_page()
-        self._draw_section_title("6. ĐỀ XUẤT CẤU TRÚC (THEO PDF)")
+        self._draw_section_title("5. ĐỀ XUẤT CẤU TRÚC")
 
         r = self.result
         pulley_data = {
@@ -441,7 +383,7 @@ class ProfessionalPDFExporter(FPDF):
             "Puly căng/đuôi (Loại B)": f"{r.recommended_pulley_diameters_mm.get('Puly căng/đuôi (Loại B)', 0):.0f} mm",
             "Puly dẫn hướng (Loại C)": f"{r.recommended_pulley_diameters_mm.get('Puly dẫn hướng (Loại C)', 0):.0f} mm",
         }
-        self._draw_key_value_table(pulley_data, "Đường kính Puly tối thiểu đề xuất (Mục 8.1)")
+        self._draw_key_value_table(pulley_data, "Đường kính Puly tối thiểu đề xuất")
         self.ln(5)
 
         idler_data = {
@@ -449,7 +391,7 @@ class ProfessionalPDFExporter(FPDF):
             "Khoảng cách con lăn nhánh về": f"{r.recommended_idler_spacing_m.get('Nhánh về (đề xuất)', 0):.2f} m",
             "Khoảng cách chuyển tiếp tối thiểu": f"{r.transition_distance_m:.3f} m",
         }
-        self._draw_key_value_table(idler_data, "Khoảng cách Con lăn đề xuất (Mục 8.2)")
+        self._draw_key_value_table(idler_data, "Khoảng cách Con lăn đề xuất")
         self.ln(5)
         
         # Thêm thông tin bộ truyền động hoàn chỉnh
@@ -487,12 +429,18 @@ class ProfessionalPDFExporter(FPDF):
                 chain_display = chain_display  # Giữ nguyên format
             
             # Tính toán tốc độ đầu ra động cơ
+            # Công thức: Tốc độ đầu ra = Tốc độ động cơ ÷ Tỉ số hộp số
             motor_rpm = getattr(r, 'motor_rpm', 1450)
-            output_rpm = motor_rpm / r.transmission_solution.gearbox_ratio
+            # Ưu tiên sử dụng motor_output_rpm đã được tính toán
+            if hasattr(r.transmission_solution, 'motor_output_rpm') and r.transmission_solution.motor_output_rpm > 0:
+                output_rpm = r.transmission_solution.motor_output_rpm
+            else:
+                # Fallback: tính toán từ motor_rpm và gearbox_ratio
+                output_rpm = motor_rpm / r.transmission_solution.gearbox_ratio
             
             transmission_data = {
                 "Chế độ hộp số": gearbox_info,
-                "Tốc độ đầu ra động cơ": f"{output_rpm:.0f} rpm",
+                "Tốc độ đầu ra động cơ (rpm)": f"{output_rpm:.0f}",
                 "Mã xích (ANSI/ISO)": chain_display,
                 "Số răng nhông dẫn": f"{r.transmission_solution.drive_sprocket_teeth}",
                 "Số răng nhông bị dẫn": f"{r.transmission_solution.driven_sprocket_teeth}",

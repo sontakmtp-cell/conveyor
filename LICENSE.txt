@@ -1,7 +1,7 @@
 Conveyor Calculator AI - License Agreement
 ==========================================
 
-Copyright (c) 2024 Conveyor Calculator AI Team
+Copyright (c) 2025 Conveyor Calculator AI Team
 All rights reserved.
 
 1. LICENSE GRANT
@@ -85,5 +85,5 @@ Trial Version
 This software is provided as a trial version with full functionality for 30 days. 
 After the trial period, you must purchase a license to continue using the software.
 
-© 2024 Conveyor Calculator AI Team. All rights reserved.
+© 2025 Conveyor Calculator AI Team. All rights reserved.
 Phát triển với ❤️ tại Việt Nam

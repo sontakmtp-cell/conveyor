@@ -134,7 +134,8 @@ class Visualization3DWidget(QWidget):
         L = float(self._safe(p, "L_m", 10.0))
         W = float(self._safe(p, "B_mm", 800.0)) / 1000.0
         H = float(self._safe(p, "H_m", 2.0))
-        V = float(self._safe(p, "V_mps", 2.5))
+        # Sử dụng tốc độ từ result nếu có, nếu không thì từ input
+        V = float(self._safe(r, "belt_speed_mps", self._safe(p, "V_mps", 2.5)))
         alpha_deg = self._safe(p, "inclination_deg", None)
         alpha = math.radians(alpha_deg) if isinstance(alpha_deg, (int, float)) else (
             math.atan2(H, L) if L > 0 else 0.0

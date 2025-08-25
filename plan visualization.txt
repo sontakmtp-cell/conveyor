@@ -1,0 +1,565 @@
+kế hoạch mở rộng tính năng visualization để tự động tạo ra mô hình 3D của băng tải dựa theo tham số tính toán đầu ra.
+
+## KẾ HOẠCH MỞ RỘNG TÍNH NĂNG VISUALIZATION 3D
+
+### 1. PHÂN TÍCH HIỆN TRẠNG
+
+**Hệ thống hiện tại:**
+- Đã có module `visualization_3d.py` với khả năng hiển thị 3D cơ bản
+- Sử dụng Three.js để render 3D trong WebEngine
+- Có thể tải mô hình GLB tham chiếu hoặc tạo mô hình thủ công
+- Đã tích hợp với hệ thống tính toán thông qua `ConveyorParameters` và `CalculationResult`
+
+**Hạn chế hiện tại:**
+- Mô hình 3D chưa được tạo tự động hoàn toàn từ tham số
+- Thiếu các thành phần chi tiết như: khung đỡ, động cơ, hộp số, xích truyền động
+- Chưa có animation cho các thành phần chuyển động phức tạp
+- Thiếu hiển thị các thông số kỹ thuật quan trọng
+
+### 2. MỤC TIÊU MỞ RỘNG
+
+**Mục tiêu chính:**
+- Tự động tạo mô hình 3D hoàn chỉnh dựa trên tham số tính toán
+- Hiển thị đầy đủ các thành phần cơ khí của băng tải
+- Tích hợp animation và hiệu ứng trực quan
+- Cung cấp giao diện tương tác nâng cao
+
+### 3. KIẾN TRÚC HỆ THỐNG MỚI
+
+#### 3.1 Cấu trúc module mới
+
+```
+ui/visualization_3d/
+├── __init__.py
+├── core/
+│   ├── __init__.py
+│   ├── model_generator.py      # Tạo mô hình 3D từ tham số
+│   ├── component_builder.py    # Xây dựng các thành phần riêng lẻ
+│   ├── animation_engine.py     # Quản lý animation và chuyển động
+│   └── physics_simulator.py    # Mô phỏng vật lý cơ bản
+├── components/
+│   ├── __init__.py
+│   ├── belt_system.py          # Hệ thống băng tải
+│   ├── drive_system.py         # Hệ thống truyền động
+│   ├── support_structure.py    # Khung đỡ và con lăn
+│   ├── material_flow.py        # Dòng vật liệu
+│   └── safety_features.py      # Tính năng an toàn
+├── enhanced_widget.py          # Widget chính nâng cấp
+└── templates/
+    ├── html_templates.py       # Template HTML nâng cao
+    └── js_templates.py         # Template JavaScript
+```
+
+#### 3.2 Tích hợp với hệ thống hiện tại
+
+```python
+# Trong core/models.py - Mở rộng CalculationResult
+@dataclass
+class CalculationResult:
+    # ... các trường hiện tại ...
+    
+    # Thêm trường cho visualization
+    visualization_data: Optional['VisualizationData'] = None
+    
+@dataclass
+class VisualizationData:
+    """Dữ liệu cho visualization 3D nâng cao"""
+    belt_dimensions: Dict[str, float] = field(default_factory=dict)
+    drive_components: Dict[str, Any] = field(default_factory=dict)
+    support_structure: Dict[str, Any] = field(default_factory=dict)
+    material_properties: Dict[str, Any] = field(default_factory=dict)
+    animation_settings: Dict[str, Any] = field(default_factory=dict)
+```
+
+### 4. CHI TIẾT THỰC HIỆN
+
+#### 4.1 Module Model Generator
+
+```python
+# ui/visualization_3d/core/model_generator.py
+class ConveyorModelGenerator:
+    """Tạo mô hình 3D hoàn chỉnh từ tham số tính toán"""
+    
+    def __init__(self, params: ConveyorParameters, result: CalculationResult):
+        self.params = params
+        self.result = result
+        self.components = {}
+    
+    def generate_complete_model(self) -> Dict[str, Any]:
+        """Tạo mô hình hoàn chỉnh"""
+        return {
+            'belt_system': self._generate_belt_system(),
+            'drive_system': self._generate_drive_system(),
+            'support_structure': self._generate_support_structure(),
+            'material_flow': self._generate_material_flow(),
+            'safety_features': self._generate_safety_features(),
+            'dimensions': self._calculate_dimensions(),
+            'materials': self._assign_materials()
+        }
+    
+    def _generate_belt_system(self) -> Dict[str, Any]:
+        """Tạo hệ thống băng tải"""
+        belt_width = self.params.B_mm / 1000.0
+        belt_length = self.params.L_m
+        belt_thickness = self.params.belt_thickness_mm / 1000.0
+        
+        return {
+            'geometry': {
+                'width': belt_width,
+                'length': belt_length,
+                'thickness': belt_thickness,
+                'trough_angle': self._parse_trough_angle(self.params.trough_angle_label)
+            },
+            'material': self._get_belt_material(self.params.belt_type),
+            'texture': self._generate_belt_texture()
+        }
+    
+    def _generate_drive_system(self) -> Dict[str, Any]:
+        """Tạo hệ thống truyền động"""
+        if not self.result.transmission_solution:
+            return self._generate_default_drive()
+            
+        transmission = self.result.transmission_solution
+        
+        return {
+            'motor': {
+                'power_kw': self.result.motor_power_kw,
+                'rpm': self.params.motor_rpm,
+                'efficiency': self.params.motor_efficiency
+            },
+            'gearbox': {
+                'ratio': transmission.gearbox_ratio,
+                'efficiency': self.params.gearbox_efficiency
+            },
+            'chain_drive': {
+                'chain_type': transmission.chain_designation,
+                'sprocket_teeth': {
+                    'drive': transmission.drive_sprocket_teeth,
+                    'driven': transmission.driven_sprocket_teeth
+                },
+                'chain_pitch': transmission.chain_pitch_mm / 1000.0
+            },
+            'pulleys': self._generate_pulleys()
+        }
+    
+    def _generate_support_structure(self) -> Dict[str, Any]:
+        """Tạo khung đỡ và con lăn"""
+        idler_spacing = self.params.carrying_idler_spacing_m
+        return_idler_spacing = self.params.return_idler_spacing_m
+        
+        return {
+            'carrying_idlers': {
+                'count': max(2, int(self.params.L_m / idler_spacing)),
+                'spacing': idler_spacing,
+                'diameter': self._calculate_idler_diameter(),
+                'trough_angle': self._parse_trough_angle(self.params.trough_angle_label)
+            },
+            'return_idlers': {
+                'count': max(2, int(self.params.L_m / return_idler_spacing)),
+                'spacing': return_idler_spacing,
+                'diameter': self._calculate_idler_diameter() * 0.8
+            },
+            'frame': self._generate_frame_structure()
+        }
+```
+
+#### 4.2 Module Component Builder
+
+```python
+# ui/visualization_3d/components/belt_system.py
+class BeltSystemBuilder:
+    """Xây dựng hệ thống băng tải 3D"""
+    
+    def __init__(self, model_data: Dict[str, Any]):
+        self.data = model_data
+    
+    def build_belt_geometry(self) -> Dict[str, Any]:
+        """Tạo geometry cho băng tải"""
+        geo = self.data['geometry']
+        
+        # Tạo băng tải chính với góc trough
+        if geo['trough_angle'] > 0:
+            return self._create_troughed_belt(geo)
+        else:
+            return self._create_flat_belt(geo)
+    
+    def _create_troughed_belt(self, geo: Dict[str, float]) -> Dict[str, Any]:
+        """Tạo băng tải có máng"""
+        # Sử dụng ShapeGeometry để tạo mặt cắt ngang
+        # Tạo đường dẫn 3D theo chiều dài
+        # Extrude để tạo khối 3D
+        pass
+    
+    def _create_flat_belt(self, geo: Dict[str, float]) -> Dict[str, Any]:
+        """Tạo băng tải phẳng"""
+        return {
+            'type': 'BoxGeometry',
+            'parameters': {
+                'width': geo['width'],
+                'height': geo['thickness'],
+                'depth': geo['length']
+            }
+        }
+```
+
+#### 4.3 Module Animation Engine
+
+```python
+# ui/visualization_3d/core/animation_engine.py
+class ConveyorAnimationEngine:
+    """Quản lý animation và chuyển động của băng tải"""
+    
+    def __init__(self, model_data: Dict[str, Any]):
+        self.data = model_data
+        self.animations = {}
+        self.time = 0
+    
+    def create_belt_animation(self) -> Dict[str, Any]:
+        """Tạo animation cho băng tải"""
+        belt_speed = self.data.get('belt_speed_mps', 2.0)
+        
+        return {
+            'type': 'belt_movement',
+            'speed': belt_speed,
+            'texture_offset': self._calculate_texture_offset(belt_speed),
+            'material_flow': self._create_material_flow_animation(belt_speed)
+        }
+    
+    def create_drive_animation(self) -> Dict[str, Any]:
+        """Tạo animation cho hệ truyền động"""
+        motor_rpm = self.data.get('motor_rpm', 1450)
+        gearbox_ratio = self.data.get('gearbox_ratio', 20.0)
+        
+        output_rpm = motor_rpm / gearbox_ratio
+        
+        return {
+            'type': 'rotary_motion',
+            'motor_rpm': motor_rpm,
+            'output_rpm': output_rpm,
+            'pulley_rotation': self._calculate_pulley_rotation(output_rpm)
+        }
+    
+    def create_idler_animation(self) -> Dict[str, Any]:
+        """Tạo animation cho con lăn"""
+        belt_speed = self.data.get('belt_speed_mps', 2.0)
+        
+        return {
+            'type': 'idler_rotation',
+            'speed': belt_speed,
+            'rotation_speed': self._calculate_idler_rotation_speed(belt_speed)
+        }
+```
+
+#### 4.4 Enhanced Widget
+
+```python
+# ui/visualization_3d/enhanced_widget.py
+class EnhancedVisualization3DWidget(Visualization3DWidget):
+    """Widget visualization 3D nâng cấp"""
+    
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.model_generator = None
+        self.animation_engine = None
+        self._setup_enhanced_features()
+    
+    def _setup_enhanced_features(self):
+        """Thiết lập tính năng nâng cao"""
+        # Thêm controls cho visualization nâng cao
+        self._add_enhanced_controls()
+        
+        # Thêm panel thông tin chi tiết
+        self._add_info_panel()
+        
+        # Thêm controls cho animation
+        self._add_animation_controls()
+    
+    def _add_enhanced_controls(self):
+        """Thêm controls nâng cao"""
+        enhanced_group = QGroupBox("Tính năng nâng cao")
+        layout = QVBoxLayout(enhanced_group)
+        
+        # Control cho hiển thị thành phần
+        self.chk_drive_system = QCheckBox("Hệ truyền động")
+        self.chk_drive_system.setChecked(True)
+        layout.addWidget(self.chk_drive_system)
+        
+        self.chk_support_structure = QCheckBox("Khung đỡ")
+        self.chk_support_structure.setChecked(True)
+        layout.addWidget(self.chk_support_structure)
+        
+        self.chk_material_flow = QCheckBox("Dòng vật liệu")
+        self.chk_material_flow.setChecked(True)
+        layout.addWidget(self.chk_material_flow)
+        
+        # Control cho chất liệu
+        self.material_combo = QComboBox()
+        self.material_combo.addItems(["Thực tế", "Wireframe", "Phân tích nhiệt"])
+        layout.addWidget(QLabel("Chế độ hiển thị:"))
+        layout.addWidget(self.material_combo)
+        
+        # Control cho camera
+        self.camera_preset_combo = QComboBox()
+        self.camera_preset_combo.addItems([
+            "Tổng quan", "Hệ truyền động", "Con lăn", "Băng tải", "Tùy chỉnh"
+        ])
+        layout.addWidget(QLabel("Góc nhìn:"))
+        layout.addWidget(self.camera_preset_combo)
+        
+        self.main_layout.addWidget(enhanced_group)
+    
+    def update_enhanced_visualization(self, params, result):
+        """Cập nhật visualization nâng cao"""
+        # Tạo mô hình 3D từ tham số
+        self.model_generator = ConveyorModelGenerator(params, result)
+        model_data = self.model_generator.generate_complete_model()
+        
+        # Tạo animation engine
+        self.animation_engine = ConveyorAnimationEngine(model_data)
+        
+        # Cập nhật visualization
+        self._load_enhanced_scene(model_data)
+    
+    def _load_enhanced_scene(self, model_data: Dict[str, Any]):
+        """Tải scene nâng cao"""
+        html = self._generate_enhanced_html(model_data)
+        self._load_html_content(html)
+```
+
+### 5. TEMPLATE HTML/JS NÂNG CAO
+
+#### 5.1 Template HTML
+
+```html
+<!-- ui/visualization_3d/templates/html_templates.py -->
+ENHANCED_HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Băng tải 3D nâng cao</title>
+    <style>
+        /* CSS nâng cao cho UI */
+        .enhanced-hud {
+            position: fixed;
+            left: 12px;
+            top: 12px;
+            padding: 12px;
+            background: rgba(0,0,0,0.8);
+            color: #fff;
+            font: 13px/1.4 system-ui;
+            border-radius: 8px;
+            z-index: 10;
+            pointer-events: none;
+            max-width: 300px;
+        }
+        
+        .component-info {
+            position: fixed;
+            right: 12px;
+            top: 12px;
+            padding: 12px;
+            background: rgba(0,0,0,0.8);
+            color: #fff;
+            font: 12px/1.4 system-ui;
+            border-radius: 8px;
+            z-index: 10;
+            max-width: 250px;
+        }
+        
+        .animation-controls {
+            position: fixed;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 8px 16px;
+            background: rgba(0,0,0,0.8);
+            color: #fff;
+            border-radius: 20px;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div class="enhanced-hud">
+        <div><strong>Thông số chính:</strong></div>
+        <div>Chiều dài: {length:.1f} m</div>
+        <div>Chiều rộng: {width:.2f} m</div>
+        <div>Chiều cao: {height:.1f} m</div>
+        <div>Góc dốc: {inclination:.1f}°</div>
+        <div>Tốc độ: {speed:.2f} m/s</div>
+        <div>Công suất: {power:.1f} kW</div>
+    </div>
+    
+    <div class="component-info">
+        <div><strong>Thành phần:</strong></div>
+        <div id="component-details">Đang tải...</div>
+    </div>
+    
+    <div class="animation-controls">
+        <button id="play-pause">⏸️</button>
+        <button id="reset">��</button>
+        <button id="slow-motion">��</button>
+        <button id="full-speed">⚡</button>
+    </div>
+    
+    {libs}
+    
+    <script>
+        // JavaScript nâng cao sẽ được inject ở đây
+        {enhanced_js}
+    </script>
+</body>
+</html>
+"""
+```
+
+#### 5.2 Template JavaScript
+
+```javascript
+// ui/visualization_3d/templates/js_templates.py
+ENHANCED_JS_TEMPLATE = """
+// Enhanced 3D Conveyor Visualization
+class EnhancedConveyorVisualization {
+    constructor(data) {
+        this.data = data;
+        this.scene = null;
+        this.camera = null;
+        this.renderer = null;
+        this.components = {};
+        this.animations = {};
+        this.isPlaying = true;
+        this.animationSpeed = 1.0;
+        
+        this.init();
+    }
+    
+    async init() {
+        await this.setupScene();
+        await this.buildConveyor();
+        this.setupAnimations();
+        this.setupControls();
+        this.animate();
+    }
+    
+    async setupScene() {
+        // Thiết lập scene, camera, renderer nâng cao
+        this.scene = new THREE.Scene();
+        this.camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 5000);
+        this.renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+        
+        // Thiết lập lighting nâng cao
+        this.setupAdvancedLighting();
+        
+        // Thiết lập post-processing
+        this.setupPostProcessing();
+    }
+    
+    async buildConveyor() {
+        // Xây dựng từng thành phần
+        await this.buildBeltSystem();
+        await this.buildDriveSystem();
+        await this.buildSupportStructure();
+        await this.buildMaterialFlow();
+        
+        // Tối ưu hóa scene
+        this.optimizeScene();
+    }
+    
+    async buildBeltSystem() {
+        const beltData = this.data.belt_system;
+        
+        // Tạo băng tải với texture và material nâng cao
+        const beltGeometry = this.createBeltGeometry(beltData.geometry);
+        const beltMaterial = this.createBeltMaterial(beltData.material);
+        
+        this.components.belt = new THREE.Mesh(beltGeometry, beltMaterial);
+        this.scene.add(this.components.belt);
+    }
+    
+    async buildDriveSystem() {
+        const driveData = this.data.drive_system;
+        
+        // Tạo động cơ
+        if (driveData.motor) {
+            this.components.motor = this.createMotor(driveData.motor);
+            this.scene.add(this.components.motor);
+        }
+        
+        // Tạo hộp số
+        if (driveData.gearbox) {
+            this.components.gearbox = this.createGearbox(driveData.gearbox);
+            this.scene.add(this.components.gearbox);
+        }
+        
+        // Tạo xích truyền động
+        if (driveData.chain_drive) {
+            this.components.chainDrive = this.createChainDrive(driveData.chain_drive);
+            this.scene.add(this.components.chainDrive);
+        }
+    }
+    
+    setupAnimations() {
+        // Thiết lập animation cho từng thành phần
+        this.animations.belt = this.createBeltAnimation();
+        this.animations.drive = this.createDriveAnimation();
+        this.animations.material = this.createMaterialFlowAnimation();
+    }
+    
+    createBeltAnimation() {
+        const belt = this.components.belt;
+        const speed = this.data.belt_speed_mps;
+        
+        return {
+            update: (deltaTime) => {
+                // Animation cho băng tải
+                if (belt.material.map) {
+                    belt.material.map.offset.x += speed * deltaTime * 0.1;
+                }
+            }
+        };
+    }
+    
+    animate() {
+        requestAnimationFrame(() => this.animate());
+        
+        if (this.isPlaying) {
+            const deltaTime = this.clock.getDelta() * this.animationSpeed;
+            
+            // Cập nhật tất cả animation
+            Object.values(this.animations).forEach(anim => {
+                if (anim.update) anim.update(deltaTime);
+            });
+        }
+        
+        this.renderer.render(this.scene, this.camera);
+    }
+}
+
+// Khởi tạo visualization
+const visualization = new EnhancedConveyorVisualization({data});
+"""
+```
+
+### 6. LỘ TRÌNH TRIỂN KHAI
+
+#### 6.1 Giai đoạn 1: Cơ sở hạ tầng
+- Tạo cấu trúc module mới
+- Implement `ConveyorModelGenerator` cơ bản
+- Tích hợp với hệ thống hiện tại
+
+#### 6.2 Giai đoạn 2: Thành phần cơ bản
+- Implement `BeltSystemBuilder`
+- Implement `DriveSystemBuilder`
+- Implement `SupportStructureBuilder`
+
+#### 6.3 Giai đoạn 3: Animation và tương tác
+- Implement `AnimationEngine`
+- Tạo template HTML/JS nâng cao
+- Thêm controls tương tác
+
+#### 6.4 Giai đoạn 4: Tối ưu hóa và testing
+- Tối ưu hóa performance
+- Testing và debug
+- Documentation
