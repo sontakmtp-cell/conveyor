@@ -14,10 +14,29 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer, Signal as pyqtSignal
 from PySide6.QtGui import QFont, QPalette, QColor
 
-from .core.animation_engine import ConveyorAnimationEngine
-from .core.component_builder import ComponentBuilderManager
-from .core.physics_simulator import ConveyorPhysicsSimulator
-from .core.model_generator import ConveyorModelGenerator
+# Import các module core
+try:
+    from ui.visualization_3d.core.animation_engine import ConveyorAnimationEngine
+    from ui.visualization_3d.core.component_builder import ComponentBuilderManager
+    from ui.visualization_3d.core.physics_simulator import ConveyorPhysicsSimulator
+    from ui.visualization_3d.core.model_generator import ConveyorModelGenerator
+except ImportError:
+    # Fallback cho trường hợp import tương đối
+    try:
+        from .core.animation_engine import ConveyorAnimationEngine
+        from .core.component_builder import ComponentBuilderManager
+        from .core.physics_simulator import ConveyorPhysicsSimulator
+        from .core.model_generator import ConveyorModelGenerator
+    except ImportError:
+        # Tạo các class giả để tránh lỗi
+        class ConveyorAnimationEngine:
+            def __init__(self, *args, **kwargs): pass
+        class ComponentBuilderManager:
+            def __init__(self, *args, **kwargs): pass
+        class ConveyorPhysicsSimulator:
+            def __init__(self, *args, **kwargs): pass
+        class ConveyorModelGenerator:
+            def __init__(self, *args, **kwargs): pass
 
 
 class AnimationControlPanel(QWidget):
@@ -701,6 +720,11 @@ class EnhancedVisualization3DWidget(QWidget):
             print(f"Lỗi trong update_enhanced_visualization: {e}")
             import traceback
             traceback.print_exc()
+    
+    def update_visualization(self, params, result):
+        """Method tương thích với code cũ - gọi update_enhanced_visualization"""
+        print("DEBUG: Gọi update_visualization (tương thích)")
+        self.update_enhanced_visualization(params, result)
     
     def _create_model_data(self, params, result) -> Dict[str, Any]:
         """Tạo dữ liệu mô hình từ params và result"""

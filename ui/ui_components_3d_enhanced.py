@@ -27,11 +27,18 @@ from .plotting import EnhancedPlotCanvas
 # 3D visualization (không làm app sập nếu thiếu WebEngine)
 HAS_3D_SUPPORT = False
 try:
-    from .visualization_3d import Visualization3DWidget  # type: ignore
+    print("DEBUG: Đang import visualization 3D...")
+    from .visualization_3d_legacy import Visualization3DWidget as LegacyVisualization3DWidget  # type: ignore
+    print("DEBUG: Import LegacyVisualization3DWidget thành công")
     from .visualization_3d.enhanced_widget import EnhancedVisualization3DWidget  # type: ignore
+    print("DEBUG: Import EnhancedVisualization3DWidget thành công")
     HAS_3D_SUPPORT = True
-except Exception:
-    Visualization3DWidget = None  # type: ignore
+    print("DEBUG: HAS_3D_SUPPORT = True")
+except Exception as e:
+    print(f"DEBUG: Lỗi import visualization 3D: {e}")
+    import traceback
+    traceback.print_exc()
+    LegacyVisualization3DWidget = None  # type: ignore
     EnhancedVisualization3DWidget = None  # type: ignore
 
 # >>> import tooltips
@@ -1169,7 +1176,7 @@ class Enhanced3DResultsPanel(QWidget):
                 # Fallback về widget cũ
                 try:
                     print("DEBUG: Đang thử tạo Visualization3DWidget...")
-                    self.viz_3d = Visualization3DWidget()
+                    self.viz_3d = LegacyVisualization3DWidget()
                     print("DEBUG: Đã tạo Visualization3DWidget thành công")
                     
                     # Đảm bảo widget 3D hiển thị nội dung mặc định

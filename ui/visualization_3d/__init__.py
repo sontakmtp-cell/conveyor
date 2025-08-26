@@ -8,9 +8,11 @@ Tự động tạo mô hình 3D từ tham số tính toán
 
 from .core.model_generator import ConveyorModelGenerator
 from .core.animation_engine import ConveyorAnimationEngine
+from .enhanced_widget import EnhancedVisualization3DWidget
 
 __version__ = "1.0.0"
 __all__ = [
     "ConveyorModelGenerator", 
-    "ConveyorAnimationEngine"
+    "ConveyorAnimationEngine",
+    "EnhancedVisualization3DWidget"
 ]
