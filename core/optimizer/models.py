@@ -6,7 +6,7 @@ from core.models import CalculationResult
 class DesignCandidate:
     # --- Gen (Các biến quyết định) ---
     belt_width_mm: int
-    belt_speed_mps: float
+    # belt_speed_mps: float  # Đã loại bỏ - tốc độ sẽ được tính tự động từ bề rộng và lưu lượng
     belt_type_name: str
     gearbox_ratio: float
     chain_spec_designation: str # Mã định danh của xích

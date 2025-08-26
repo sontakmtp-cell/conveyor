@@ -22,9 +22,19 @@ class OptimizerWorker(QObject):
         """Execute the optimization."""
         try:
             self.status.emit("🚀 Bắt đầu quá trình tối ưu hóa nâng cao...")
+            
+            # Kiểm tra tham số đầu vào
+            if not self.base_params:
+                raise ValueError("Tham số cơ bản không hợp lệ")
+            
+            if not self.opt_settings:
+                raise ValueError("Cài đặt tối ưu hóa không hợp lệ")
+            
+            self.status.emit("🔧 Khởi tạo bộ tối ưu hóa...")
             optimizer = Optimizer(self.base_params, self.opt_settings)
             
             # Chạy tối ưu với tham số giảm để tránh quá tải
+            self.status.emit("⚡ Đang chạy thuật toán di truyền...")
             results = optimizer.run(generations=30, population_size=50)
             
             if results:

@@ -10,9 +10,10 @@ def validate_input_ranges(p: ConveyorParameters) -> List[str]:
     data = ACTIVE_MATERIAL_DB.get(p.material, {})
     max_speed = data.get("v_max", 4.0)
 
-    if p.V_mps > max_speed:
+    # Kiểm tra V_mps chỉ khi nó không phải None
+    if p.V_mps is not None and p.V_mps > max_speed:
         warns.append(f"Tốc độ băng {p.V_mps:.2f} m/s vượt khuyến cáo cho {p.material} ({max_speed:.2f} m/s).")
-    if p.particle_size_mm > 100 and p.V_mps > 2.5:
+    if p.particle_size_mm > 100 and p.V_mps is not None and p.V_mps > 2.5:
         warns.append("Kích thước hạt lớn, nên giảm tốc độ băng (< 2.5 m/s) để hạn chế mài mòn và văng rơi.")
     if abs(p.inclination_deg) > 18:
         warns.append("Góc nghiêng lớn (>18°), cần kiểm tra trượt vật liệu hoặc dùng băng có gân.")
@@ -40,14 +41,16 @@ def validate_input_ranges(p: ConveyorParameters) -> List[str]:
     try:
         trough_deg = parse_trough_label(getattr(p, "trough_angle_label", "20°"))
         surcharge_deg = float(getattr(p, "surcharge_angle_deg", 20.0) or 20.0)
-        Qt_calc, _ = capacity_from_geometry_tph(p.B_mm, trough_deg, surcharge_deg, p.V_mps, p.density_tpm3)
-        if p.Qt_tph > 1.05 * Qt_calc:
-            warns.append(
-                f"Lưu lượng yêu cầu {p.Qt_tph:.1f} t/h vượt năng lực tiết diện Q_max≈{Qt_calc:.1f} t/h "
-                f"(B={p.B_mm} mm, máng≈{trough_deg:.0f}°, surcharge≈{surcharge_deg:.0f}°)."
-            )
-        elif p.Qt_tph > 0.95 * Qt_calc:
-            warns.append(f"Lưu lượng yêu cầu đang tiệm cận năng lực tiết diện ({p.Qt_tph/Qt_calc*100:.1f}%).")
+        # Chỉ kiểm tra capacity khi V_mps không phải None
+        if p.V_mps is not None:
+            Qt_calc, _ = capacity_from_geometry_tph(p.B_mm, trough_deg, surcharge_deg, p.V_mps, p.density_tpm3)
+            if p.Qt_tph > 1.05 * Qt_calc:
+                warns.append(
+                    f"Lưu lượng yêu cầu {p.Qt_tph:.1f} t/h vượt năng lực tiết diện Q_max≈{Qt_calc:.1f} t/h "
+                    f"(B={p.B_mm} mm, máng≈{trough_deg:.0f}°, surcharge≈{surcharge_deg:.0f}°)."
+                )
+            elif p.Qt_tph > 0.95 * Qt_calc:
+                warns.append(f"Lưu lượng yêu cầu đang tiệm cận năng lực tiết diện ({p.Qt_tph/Qt_calc*100:.1f}%).")
     except Exception:
         pass
 

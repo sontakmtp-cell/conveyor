@@ -31,7 +31,7 @@ HTML = {
     "spn_length": "<b>Chiều dài L (m)</b><br>Băng dài bao nhiêu. Dài thì ma sát nhiều hơn.",
     "spn_height": "<b>Độ cao H (m)</b><br>Nâng vật liệu lên cao bao nhiêu. Cao hơn cần nhiều lực hơn.",
     "spn_incl": "<b>Góc nghiêng (°)</b><br>Dốc lên hay dốc xuống bao nhiêu. Dốc quá dễ trượt rơi.",
-    "spn_speed": "<b>Tốc độ băng (m/s)</b><br>Băng chạy nhanh hay chậm. Nhanh chở nhiều nhưng dễ văng rơi.",
+    "spn_speed": "<b>Tốc độ băng (m/s)</b><br>🚀 <b>GIỜ ĐÂY TÍNH TỰ ĐỘNG!</b><br>Hệ thống sẽ tự động tính tốc độ tối ưu dựa trên:<br>• Lưu lượng yêu cầu<br>• Bề rộng băng được chọn<br>• Loại vật liệu và kích thước hạt<br><br>Không cần nhập tay - kết quả sẽ hiển thị trong tab 'Tổng quan'",
     "spn_hours": "<b>Giờ chạy mỗi ngày</b><br>Dùng để ước tính điện năng.",
 
     # Băng
@@ -138,6 +138,20 @@ HTML = {
         "• Tốc độ thấp = giảm tốc ít = hộp số tỉ số nhỏ"
     ),
     # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
+    
+    # --- [BẮT ĐẦU NÂNG CẤP TỐC ĐỘ ĐẦU RA ĐỘNG CƠ] ---
+    "motor_output_rpm": (
+        "<b>Tốc độ đầu ra động cơ (vòng/phút)</b><br>"
+        "Tốc độ quay của trục đầu ra động cơ sau khi qua hộp số giảm tốc.<br><br>"
+        "<u>Công thức tính:</u><br>"
+        "• Tốc độ đầu ra = Tốc độ động cơ ÷ Tỉ số hộp số<br>"
+        "• Ví dụ: 1450 rpm ÷ 15 = 96.7 rpm<br><br>"
+        "<u>Ý nghĩa:</u><br>"
+        "• Tốc độ này sẽ quay trực tiếp puly dẫn động<br>"
+        "• Càng thấp thì puly quay càng chậm, băng tải chạy càng chậm<br>"
+        "• Phải phù hợp với vận tốc băng tải yêu cầu"
+    ),
+    # --- [KẾT THÚC NÂNG CẤP TỐC ĐỘ ĐẦU RA ĐỘNG CƠ] ---
 }
 
 def _set_tt(obj: Any, name: str, text: str) -> None:

@@ -60,7 +60,6 @@ class ConveyorParameters:
     L_m: float
     H_m: float
     inclination_deg: float
-    V_mps: float
     operating_hours: int
     B_mm: int
     belt_type: str
@@ -92,11 +91,16 @@ class ConveyorParameters:
     # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
     
     # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
-    # Chế độ chọn tỉ số hộp số: "auto" | "manual"
+    # Chế độ chọn tỉ số hộp số: "auto" | "manual" - ảnh hưởng đến cách tính tốc độ đầu ra động cơ
     gearbox_ratio_mode: str = "auto"
-    # Tỉ số hộp số do người dùng nhập (>0 khi mode="manual")
+    # Tỉ số hộp số do người dùng nhập (>0 khi mode="manual") - dùng để tính tốc độ đầu ra động cơ
     gearbox_ratio_user: float = 0.0
     # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
+    
+    # --- [BẮT ĐẦU NÂNG CẤP TỐC ĐỘ BĂNG TỰ ĐỘNG] ---
+    # Tốc độ băng - để trống để tự động tính toán
+    V_mps: Optional[float] = None
+    # --- [KẾT THÚC NÂNG CẤP TỐC ĐỘ BĂNG TỰ ĐỘNG] ---
     
     db_path: str = ""
 
@@ -180,14 +184,25 @@ class CalculationResult:
     
     # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
     # Thông tin về chế độ hộp số được sử dụng
-    gearbox_ratio_mode: str = "auto"  # Chế độ đã sử dụng: "auto" | "manual"
-    gearbox_ratio_user: float = 0.0   # Tỉ số hộp số do người dùng nhập (nếu manual)
+    gearbox_ratio_mode: str = "auto"  # Chế độ đã sử dụng: "auto" | "manual" - ảnh hưởng đến cách tính tốc độ đầu ra động cơ
+    gearbox_ratio_user: float = 0.0   # Tỉ số hộp số do người dùng nhập (nếu manual) - dùng để tính tốc độ đầu ra động cơ
     # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
     
     # --- [BẮT ĐẦU SỬA LỖI UI] ---
-    # Tốc độ động cơ (vòng/phút) - cần thiết để UI hiển thị
+    # Tốc độ động cơ (vòng/phút) - cần thiết để UI hiển thị và tính toán tốc độ đầu ra
     motor_rpm: int = 1450
     # --- [KẾT THÚC SỬA LỖI UI] ---
+    
+    # --- [BẮT ĐẦU NÂNG CẤP TỐC ĐỘ BĂNG TỰ ĐỘNG] ---
+    # Các trường cho tốc độ băng được tính toán tự động
+    belt_speed_mps: float = 0.0                    # Tốc độ băng cuối cùng (m/s)
+    belt_speed_required_mps: float = 0.0           # Tốc độ cần thiết để đạt lưu lượng (m/s)
+    belt_speed_recommended_mps: float = 0.0        # Tốc độ khuyến nghị từ vật liệu (m/s)
+    belt_width_selected_mm: int = 0                # Bề rộng băng được chọn (mm)
+    cross_section_utilization_percent: float = 0.0 # % sử dụng tiết diện
+    speed_warnings: List[str] = field(default_factory=list)  # Cảnh báo về tốc độ
+    max_speed_allowed_mps: float = 0.0             # Tốc độ tối đa cho phép theo bảng tra (m/s)
+    # --- [KẾT THÚC NÂNG CẤP TỐC ĐỘ BĂNG TỰ ĐỘNG] ---
 
 # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
 # Model cho thông số xích
@@ -214,7 +229,7 @@ class ChainSpec:
 # Model cho giải pháp truyền động hoàn chỉnh
 @dataclass
 class TransmissionSolution:
-    gearbox_ratio: float = 0.0  # Tỉ số truyền của hộp số
+    gearbox_ratio: float = 0.0  # Tỉ số truyền của hộp số (dùng để tính tốc độ đầu ra động cơ)
     drive_sprocket_teeth: int = 0  # Số răng nhông dẫn
     driven_sprocket_teeth: int = 0  # Số răng nhông bị dẫn
     chain_pitch_mm: float = 0.0  # Bước xích (mm)
@@ -233,8 +248,8 @@ class TransmissionSolution:
     
     # --- [BẮT ĐẦU SỬA LỖI UI] ---
     # Các thuộc tính bổ sung để UI có thể truy cập đúng
-    gearbox_ratio_mode: str = "auto"  # Chế độ hộp số (auto/manual)
-    motor_output_rpm: float = 0.0     # Tốc độ đầu ra động cơ (RPM)
+    gearbox_ratio_mode: str = "auto"  # Chế độ hộp số (auto/manual) - ảnh hưởng đến cách tính tốc độ đầu ra động cơ
+    motor_output_rpm: float = 0.0     # Tốc độ đầu ra động cơ (RPM) = Tốc độ động cơ ÷ Tỉ số hộp số
     actual_velocity_mps: float = 0.0  # Vận tốc băng tải thực tế (m/s) - alias cho actual_belt_velocity
     velocity_error_percent: float = 0.0  # Sai số vận tốc (%) - alias cho error
     required_force_kN: float = 0.0    # Lực kéo yêu cầu (kN) - alias

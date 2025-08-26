@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QLabel, QFileDialog, QMessageBox, QTableWidgetItem, QDialog, QTextBrowser,
     QDockWidget
 )
-from PySide6.QtGui import QAction, QIcon, QActionGroup
+from PySide6.QtGui import QAction, QIcon, QActionGroup, QColor
 from PySide6.QtCore import Qt, QTimer, QThread
 
 # --- [BẮT ĐẦU NÂNG CẤP TỐI ƯU HÓA] ---
@@ -425,9 +425,10 @@ class Enhanced3DConveyorWindow(QMainWindow):
         self.inputs.btn_opt.clicked.connect(self._run_advanced_optimization) # Changed
         self.inputs.cbo_material.currentTextChanged.connect(self._on_material_changed)
         self.inputs.cbo_drive.currentTextChanged.connect(self.inputs.update_drive_illustration)
-        self.results.chk_t2.stateChanged.connect(self._redraw_all_visualizations)
-        self.results.chk_friction.stateChanged.connect(self._redraw_all_visualizations)
-        self.results.chk_lift.stateChanged.connect(self._redraw_all_visualizations)
+        # Kết nối các checkbox với phương thức vẽ lại biểu đồ
+        self.results.chk_t2.stateChanged.connect(self.results._redraw_charts)
+        self.results.chk_friction.stateChanged.connect(self.results._redraw_charts)
+        self.results.chk_lift.stateChanged.connect(self.results._redraw_charts)
         # --- [BẮT ĐẦU NÂNG CẤP TỐI ƯU HÓA] ---
         self.results.optimizer_result_selected.connect(self._apply_optimizer_solution)
         # --- [KẾT THÚC NÂNG CẤP TỐI ƯU HÓA] ---
@@ -452,7 +453,7 @@ class Enhanced3DConveyorWindow(QMainWindow):
             L_m=i.spn_length.value(),
             H_m=i.spn_height.value(),
             inclination_deg=i.spn_incl.value(),
-            V_mps=i.spn_speed.value(),
+            V_mps=None,  # Giờ đây được tính tự động - không cần nhập tay
             operating_hours=i.spn_hours.value(),
             B_mm=int(i.cbo_width.currentText() or 0),
             belt_type=i.cbo_belt_type.currentText(),
@@ -507,11 +508,8 @@ class Enhanced3DConveyorWindow(QMainWindow):
 
     def _quick_calculate(self):
         i = self.inputs
-        mat = i.cbo_material.currentText()
-        vmax = ACTIVE_MATERIAL_DB.get(mat, {}).get("v_max", 4.0)
-        if i.spn_speed.value() > vmax:
-            i.spn_speed.setValue(round(0.8 * vmax, 2))
-            self.statusBar().showMessage("Đã hạ tốc độ về mức khuyến cáo theo vật liệu.")
+        # Tốc độ băng giờ đây được tính tự động - không cần kiểm tra
+        self.statusBar().showMessage("🚀 Tốc độ băng sẽ được tính tự động dựa trên lưu lượng và bề rộng")
         self._start_thread(self._collect())
 
     # --- [BẮT ĐẦU NÂNG CẤP TỐI ƯU HÓA] ---
@@ -644,7 +642,7 @@ class Enhanced3DConveyorWindow(QMainWindow):
         """Cập nhật lại input panel với giải pháp được chọn và chạy tính toán chi tiết."""
         i = self.inputs
         i.cbo_width.setCurrentText(str(candidate.belt_width_mm))
-        i.spn_speed.setValue(candidate.belt_speed_mps)
+        # Tốc độ băng giờ đây được tính tự động - không cần set
         i.cbo_belt_type.setCurrentText(candidate.belt_type_name)
         i.cbo_gearbox_ratio_mode.setCurrentText("Chỉ định")
         i.spn_gearbox_ratio_user.setValue(candidate.gearbox_ratio)
@@ -677,10 +675,8 @@ class Enhanced3DConveyorWindow(QMainWindow):
             self.inputs.lbl_material_info.setWordWrap(True)
             self.inputs.lbl_material_info.setStyleSheet("color: #2563eb; font-style: normal; padding: 5px; background-color: #eff6ff; border: 1px solid #dbeafe; border-radius: 4px;")
             
-            # Kiểm tra và điều chỉnh tốc độ nếu cần
-            if self.inputs.spn_speed.value() > v_max:
-                self.inputs.spn_speed.setValue(round(0.8 * v_max, 2))
-                self.statusBar().showMessage(f"Tốc độ đã được chỉnh theo {mat}.")
+            # Tốc độ băng giờ đây được tính tự động - không cần kiểm tra
+            self.statusBar().showMessage(f"🚀 Tốc độ băng sẽ được tính tự động cho vật liệu {mat}")
             
             # Tự động tính toán lại khi vật liệu thay đổi
             if hasattr(self, 'current_result') and self.current_result is not None:
@@ -708,7 +704,6 @@ class Enhanced3DConveyorWindow(QMainWindow):
     def _update_validation_styles(self, warnings: list[str]):
         i = self.inputs
         warning_map = {
-            "Tốc độ băng": i.spn_speed,
             "Góc nghiêng lớn": i.spn_incl,
             "Lưu lượng": i.spn_capacity,
             "Chiều dài băng": i.spn_length,
@@ -716,7 +711,7 @@ class Enhanced3DConveyorWindow(QMainWindow):
             "Vật liệu/MT ăn mòn": i.cbo_belt_type
         }
 
-        all_widgets = [i.spn_speed, i.spn_incl, i.spn_capacity, i.spn_length, i.spn_temp, i.cbo_belt_type]
+        all_widgets = [i.spn_incl, i.spn_capacity, i.spn_length, i.spn_temp, i.cbo_belt_type]
         for widget in all_widgets:
             widget.setProperty("state", "default")
             widget.style().unpolish(widget)
@@ -743,13 +738,29 @@ class Enhanced3DConveyorWindow(QMainWindow):
                 card.style().polish(card)
 
             cards = self.results.cards
+            set_card(cards.card_speed, f"{r.belt_speed_mps:.2f} m/s", "success")
             set_card(cards.card_power, f"{r.motor_power_kw:.1f} kW", "success" if r.motor_power_kw < 50 else "warning" if r.motor_power_kw < 100 else "danger")
             eff = getattr(r, "drive_efficiency_percent", getattr(r, "efficiency", 0.0))
             set_card(cards.card_eff, f"{eff:.1f} %", "success" if eff > 80 else "warning" if eff > 60 else "danger")
             set_card(cards.card_sf, f"{r.safety_factor:.2f}", "success" if r.safety_factor > 8 else "warning" if r.safety_factor > 5 else "danger")
             set_card(cards.card_cost, f"${r.cost_capital_total:,.0f}", "success")
 
+            # Thêm thông tin tốc độ băng vào đầu danh sách
+            belt_speed = getattr(r, 'belt_speed_mps', 0.0)
+            belt_speed_recommended = getattr(r, 'recommended_speed_mps', 0.0)
+            belt_width = getattr(r, 'belt_width_mm', 0)
+            
+            # Kiểm tra xem có cần hiển thị cảnh báo tốc độ không
+            max_speed_allowed = getattr(r, 'max_speed_allowed_mps', 0.0)
+            speed_warning = False
+            speed_warning_message = ""
+            
+            if max_speed_allowed > 0 and belt_speed > max_speed_allowed:
+                speed_warning = True
+                speed_warning_message = f"⚠️ CẢNH BÁO: Tốc độ tính toán ({belt_speed:.2f} m/s) vượt quá tốc độ tối đa cho phép ({max_speed_allowed:.2f} m/s) theo bảng tra cho bề rộng {belt_width}mm. Thiết kế này KHÔNG TỐI ƯU - cần tăng bề rộng băng hoặc giảm lưu lượng."
+            
             vals = [
+                f"{belt_speed:.2f}", f"{self.inputs.cbo_width.currentText()}",
                 f"{r.mass_flow_rate:.3f}", f"{r.material_load_kgpm:.2f}", f"{r.belt_weight_kgpm:.2f}",
                 f"{r.moving_parts_weight_kgpm:.2f}", f"{r.total_load_kgpm:.2f}", f"{r.friction_force:,.0f}",
                 f"{r.lift_force:,.0f}", f"{r.effective_tension:,.0f}",
@@ -758,6 +769,7 @@ class Enhanced3DConveyorWindow(QMainWindow):
                 f"{r.motor_power_kw:.1f}", f"{r.drum_diameter_mm:.0f}"
             ]
             labels = [
+                "Tốc độ băng tính toán (m/s)", "Bề rộng băng (mm)",
                 "Lưu lượng khối (kg/s)", "Tải trọng vật liệu (kg/m)", "Khối lượng băng (kg/m)",
                 "KL bộ phận chuyển động (kg/m)", "Tổng tải (kg/m)", "Tổng lực ma sát (N)",
                 "Lực nâng (N)", "Lực căng hiệu dụng (N)",
@@ -767,9 +779,34 @@ class Enhanced3DConveyorWindow(QMainWindow):
             self.results.tbl.setRowCount(len(labels))
             for i, label in enumerate(labels):
                 self.results.tbl.setItem(i, 0, QTableWidgetItem(label))
-                self.results.tbl.setItem(i, 1, QTableWidgetItem(vals[i] if i < len(vals) else "---"))
+                
+                # Tạo item cho giá trị kết quả
+                value_item = QTableWidgetItem(vals[i] if i < len(vals) else "---")
+                
+                # Nếu là dòng tốc độ băng và có cảnh báo, hiển thị màu đỏ cho giá trị kết quả
+                if i == 0 and speed_warning:  # Dòng đầu tiên là tốc độ băng
+                    value_item.setBackground(QColor("#fef2f2"))  # Màu nền đỏ nhạt
+                    value_item.setForeground(QColor("#dc2626"))  # Màu chữ đỏ
+                    value_item.setToolTip(speed_warning_message)
+                
+                self.results.tbl.setItem(i, 1, value_item)
 
             ana_report_html = "<h3>PHÂN TÍCH KỸ THUẬT</h3>"
+            
+            # Thêm thông tin tốc độ băng
+            belt_speed = getattr(r, 'belt_speed_mps', 0.0)
+            belt_width = getattr(r, 'belt_width_mm', 0)
+            
+            ana_report_html += f"<p><b>- Tốc độ băng tính toán:</b> {belt_speed:.2f} m/s</p>"
+            ana_report_html += f"<p><b>- Bề rộng băng được chọn:</b> {belt_width:.0f} mm</p>"
+            
+            # Thêm thông tin tốc độ tối đa cho phép
+            if max_speed_allowed > 0:
+                if speed_warning:
+                    ana_report_html += f"<p style='color: #dc2626;'><b>⚠️ Tốc độ tối đa cho phép:</b> {max_speed_allowed:.2f} m/s <b>(VƯỢT QUÁ!)</b></p>"
+                else:
+                    ana_report_html += f"<p style='color: #059669;'><b>✅ Tốc độ tối đa cho phép:</b> {max_speed_allowed:.2f} m/s</p>"
+            
             ana_report_html += f"<p><b>- Hiệu suất truyền động:</b> {eff:.1f}% (η_m × η_g ÷ Kt)</p>"
             ana_report_html += f"<p><b>- Phần trăm sử dụng cường độ đai:</b> {r.belt_strength_utilization:.1f}%</p>"
             ana_report_html += f"<p><b>- Phần trăm sử dụng tiết diện (ước tính):</b> {r.capacity_utilization:.1f}%</p>"
@@ -797,14 +834,7 @@ class Enhanced3DConveyorWindow(QMainWindow):
                            f"   => TỔNG CHI PHÍ VẬN HÀNH/NĂM: ${r.op_cost_total_per_year:,.2f}\n")
             self.results.txt_cost_analysis.setPlainText(cost_report)
 
-            summary_report = (f"BÁO CÁO TÓM TẮT\n{'-'*40}\n"
-                              f"• Công suất động cơ khuyến cáo: {r.motor_power_kw:.1f} kW\n"
-                              f"• Hiệu suất truyền động: {eff:.1f}%\n"
-                              f"• Hệ số an toàn của băng: {r.safety_factor:.2f}\n"
-                              f"• Đường kính tang khuyến cáo: {r.drum_diameter_mm:.0f} mm\n"
-                              f"• Ước tính chi phí đầu tư (CAPEX): ${r.cost_capital_total:,.2f}\n"
-                              f"• Ước tính chi phí vận hành/năm (OPEX): ${r.op_cost_total_per_year:,.2f}\n")
-            self.results.txt_report.setPlainText(summary_report)
+
             
             # Cập nhật thông tin truyền động
             self._redraw_all_visualizations()

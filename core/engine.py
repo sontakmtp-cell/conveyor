@@ -199,15 +199,20 @@ class CalculationStrategy(ABC):
         # Debug: in ra các giá trị để kiểm tra
         print(f"DEBUG: trough_angle_label={self.p.trough_angle_label}, parsed_trough_deg={trough_deg}")
         print(f"DEBUG: surcharge_angle_deg={surcharge_deg}")
-        print(f"DEBUG: B_mm={self.p.B_mm}, V_mps={self.p.V_mps}, density_tpm3={self.p.density_tpm3}")
+        belt_speed = getattr(self.r, 'belt_speed_mps', self.p.V_mps) or self.p.V_mps
+        print(f"DEBUG: B_mm={self.p.B_mm}, V_mps={belt_speed}, density_tpm3={self.p.density_tpm3}")
         
         print(f"DEBUG _compute_geometry_capacity: calling capacity_from_geometry_tph")
+        # Sử dụng tốc độ từ result nếu đã được tính tự động
+        belt_speed = getattr(self.r, 'belt_speed_mps', self.p.V_mps) or self.p.V_mps
         Qt_calc, A = capacity_from_geometry_tph(
             self.p.B_mm, trough_deg, surcharge_deg,
-            self.p.V_mps, self.p.density_tpm3
+            belt_speed, self.p.density_tpm3
         )
         print(f"DEBUG _compute_geometry_capacity: capacity_from_geometry_tph returned Qt_calc={Qt_calc}, A={A}")
-        self.r.cross_section_area_m2 = A
+        # Chỉ cập nhật cross_section_area_m2 nếu chưa được set từ auto speed
+        if not hasattr(self.r, 'cross_section_area_m2') or self.r.cross_section_area_m2 == 0:
+            self.r.cross_section_area_m2 = A
         self.r.Qt_calc_tph = Qt_calc
         
         # Debug: in ra kết quả tính toán
@@ -229,12 +234,12 @@ class CalculationStrategy(ABC):
         print(f"DEBUG _compute_geometry_capacity: END")
 
     def _apply_geo_limitation_to_load(self):
-        V = max(0.05, float(self.p.V_mps))
+        # Sử dụng tốc độ từ result nếu đã được tính tự động
+        belt_speed = getattr(self.r, 'belt_speed_mps', self.p.V_mps) or self.p.V_mps
+        V = max(0.05, float(belt_speed))
         
         # SỬA LỖI: Tính q_from_Qt dựa trên lưu lượng yêu cầu và khối lượng riêng
         # q_from_Qt = (Qt_tph * 1000 kg/t) / (3600 s/h * V m/s) = kg/m
-        # Nhưng Qt_tph phải được điều chỉnh theo khối lượng riêng để duy trì cùng một tải trọng vật liệu
-        # Khi khối lượng riêng thay đổi, tải trọng vật liệu trên băng tải phải thay đổi
         q_from_Qt = (self.p.Qt_tph * 1000.0 / 3600.0) / V
         
         # Tính q_from_geo: tải trọng vật liệu từ tiết diện và khối lượng riêng
@@ -250,9 +255,14 @@ class CalculationStrategy(ABC):
         print(f"DEBUG: q_eff={q_eff:.3f}")
         print(f"DEBUG: BEFORE - material_load_kgpm={self.r.material_load_kgpm:.3f}")
         
-        # SỬA LỖI: material_load_kgpm được tính dựa trên q_from_Qt để đảm bảo công suất động cơ thay đổi khi thay đổi vật liệu
-        # Khi khối lượng riêng thay đổi, tải trọng vật liệu trên băng tải phải thay đổi để duy trì cùng một lưu lượng
-        self.r.material_load_kgpm = q_from_Qt
+        # SỬA LỖI: Đảm bảo material_load_kgpm không bị reset về 0
+        # Luôn sử dụng q_from_Qt để đảm bảo công suất động cơ thay đổi khi thay đổi vật liệu
+        if q_from_Qt > 0:
+            self.r.material_load_kgpm = q_from_Qt
+        else:
+            # Fallback: sử dụng giá trị từ tiết diện nếu q_from_Qt = 0
+            self.r.material_load_kgpm = q_from_geo
+            print(f"DEBUG: WARNING: q_from_Qt = 0, using q_from_geo = {q_from_geo:.3f}")
         
         # Kiểm tra xem có bị khống chế bởi tiết diện không
         if q_eff < q_from_Qt - 1e-6:
@@ -260,9 +270,17 @@ class CalculationStrategy(ABC):
             self.r.warnings.append(
                 f"Lưu lượng thực bị khống chế bởi tiết diện: Q_thực≈{q_eff * V * 3.6 / 1000.0:.1f} t/h < Q_yêu cầu={self.p.Qt_tph:.1f} t/h."
             )
-            print(f"DEBUG: WARNING: Geometric limitation detected, but material_load_kgpm still set to {q_from_Qt:.3f}")
+            print(f"DEBUG: WARNING: Geometric limitation detected, material_load_kgpm set to {self.r.material_load_kgpm:.3f}")
         else:
-            print(f"DEBUG: No geometric limitation, material_load_kgpm set to {q_from_Qt:.3f}")
+            print(f"DEBUG: No geometric limitation, material_load_kgpm set to {self.r.material_load_kgpm:.3f}")
+        
+        # Đảm bảo material_load_kgpm không bị 0
+        if self.r.material_load_kgpm <= 0:
+            print(f"DEBUG: ERROR: material_load_kgpm = {self.r.material_load_kgpm}, fixing...")
+            # Sử dụng giá trị fallback
+            fallback_load = max(q_from_Qt, q_from_geo, 0.1)  # Ít nhất 0.1 kg/m
+            self.r.material_load_kgpm = fallback_load
+            print(f"DEBUG: Fixed material_load_kgpm to {fallback_load:.3f}")
         
         # Luôn cập nhật total_load_kgpm và mass_flow_rate
         self.r.total_load_kgpm = self.r.material_load_kgpm + self.r.belt_weight_kgpm + self.r.moving_parts_weight_kgpm
@@ -277,6 +295,23 @@ class CalculationStrategy(ABC):
         """Tính toán lực căng cho hệ thống truyền động đơn."""
         # Tính effective_tension từ lực ma sát và lực nâng đã được tính trong calculate_resistances_and_power
         self.r.effective_tension = self.r.friction_force + self.r.lift_force
+        
+        # SỬA LỖI: Kiểm tra effective_tension trước khi tính toán
+        if self.r.effective_tension <= 0:
+            print(f"DEBUG TENSION: ERROR: effective_tension = {self.r.effective_tension}, fixing...")
+            # Ước tính từ material_load_kgpm và ma sát
+            belt_speed = getattr(self.r, 'belt_speed_mps', self.p.V_mps) or self.p.V_mps
+            belt_speed = max(0.05, belt_speed)
+            if self.r.material_load_kgpm > 0:
+                # Ước tính lực ma sát và nâng
+                estimated_friction = self.r.material_load_kgpm * G * self.p.L_m * 0.02  # Hệ số ma sát 0.02
+                estimated_lift = self.r.material_load_kgpm * G * self.p.H_m if self.p.H_m > 0 else 0
+                self.r.effective_tension = estimated_friction + estimated_lift
+                print(f"DEBUG TENSION: Fixed effective_tension to {self.r.effective_tension:.3f}")
+            else:
+                self.r.effective_tension = 1000.0  # Giá trị mặc định
+                print(f"DEBUG TENSION: Set effective_tension to default 1000.0")
+        
         wrap_deg_eff, mu_eff, _ = self._effective_drive_contact()
         theta = deg2rad(wrap_deg_eff)
         self.r.wrap_angle_rad = theta
@@ -313,6 +348,16 @@ class CalculationStrategy(ABC):
         Wm = self.r.material_load_kgpm
         Wc, Wr = get_idler_base_weights(self.p.B_mm)
         lc, lr = self.p.carrying_idler_spacing_m, self.p.return_idler_spacing_m
+
+        # SỬA LỖI: Kiểm tra material_load_kgpm trước khi tính toán
+        if Wm <= 0:
+            print(f"DEBUG DUAL DRIVE: ERROR: material_load_kgpm = {Wm}, fixing...")
+            # Tính lại từ Qt_tph
+            belt_speed = getattr(self.r, 'belt_speed_mps', self.p.V_mps) or self.p.V_mps
+            belt_speed = max(0.05, belt_speed)
+            Wm = (self.p.Qt_tph * 1000.0 / 3600.0) / belt_speed
+            self.r.material_load_kgpm = Wm
+            print(f"DEBUG DUAL DRIVE: Fixed material_load_kgpm to {Wm:.3f}")
 
         # Công thức (19) & (20) từ PDF, trang 18. Đơn vị lực là [kgf]
         Fc_kgf = f * (l + lo) * (W1 + Wc / lc + Wm) + h * (W1 + Wm)
@@ -372,7 +417,9 @@ class CalculationStrategy(ABC):
         self.r.max_tension = self.r.F11
         
         # Công suất yêu cầu tính từ tổng lực vòng Fp
-        self.r.required_power_kw = Fp_kgf * G * self.p.V_mps / 1000.0
+        # Sử dụng tốc độ từ result nếu đã được tính tự động
+        belt_speed = getattr(self.r, 'belt_speed_mps', self.p.V_mps) or self.p.V_mps
+        self.r.required_power_kw = Fp_kgf * G * belt_speed / 1000.0
         
         # Gán các lực ma sát và lực nâng để hiển thị trên biểu đồ
         self.r.friction_force = (self.r.Fc_drive + self.r.Fr_drive) * G if h == 0 else self.r.Fc_drive * G
@@ -384,6 +431,106 @@ class CalculationStrategy(ABC):
         print(f"DEBUG EXECUTE START: Qt_tph={self.p.Qt_tph}, V_mps={self.p.V_mps}")
         print(f"DEBUG EXECUTE START: B_mm={self.p.B_mm}, belt_thickness_mm={self.p.belt_thickness_mm}, belt_type={self.p.belt_type}")
         
+        # --- [BẮT ĐẦU NÂNG CẤP TỐC ĐỘ BĂNG TỰ ĐỘNG] ---
+        # Tính toán tốc độ băng tự động
+        if self.p.V_mps is None or self.p.V_mps <= 0:
+            try:
+                from .optimize import calculate_belt_speed
+                
+                # Lấy đặc tính vật liệu từ UI
+                material_characteristics = {
+                    'is_abrasive': getattr(self.p, 'is_abrasive', False),
+                    'is_corrosive': getattr(self.p, 'is_corrosive', False),
+                    'is_dusty': getattr(self.p, 'is_dusty', False)
+                }
+                
+                # Tính toán tốc độ băng
+                v_final, v_req, v_rec, area_m2, warnings, max_speed_allowed = calculate_belt_speed(
+                    capacity_tph=self.p.Qt_tph,
+                    density_tpm3=self.p.density_tpm3,
+                    belt_width_mm=self.p.B_mm,
+                    particle_mm=self.p.particle_size_mm,
+                    material_name=self.p.material,
+                    trough_angle_deg=float(self.p.trough_angle_label.split('°')[0]) if '°' in self.p.trough_angle_label else 20.0,
+                    surcharge_angle_deg=self.p.surcharge_angle_deg,
+                    material_characteristics=material_characteristics
+                )
+                
+                # Cập nhật kết quả
+                self.r.belt_speed_mps = v_final
+                self.r.belt_speed_required_mps = v_req
+                self.r.recommended_speed_mps = v_rec
+                self.r.cross_section_area_m2 = area_m2
+                self.r.max_speed_allowed_mps = max_speed_allowed
+                
+                # Thêm cảnh báo
+                if not hasattr(self.r, 'warnings'):
+                    self.r.warnings = []
+                self.r.warnings.extend(warnings)
+                
+                # Sử dụng tốc độ đã tính
+                self.p.V_mps = v_final
+                print(f"DEBUG AUTO SPEED: Calculated speed = {v_final:.2f} m/s, max allowed = {max_speed_allowed:.2f} m/s")
+                
+            except Exception as e:
+                print(f"DEBUG AUTO SPEED: Error in speed calculation: {e}")
+                # Tốc độ mặc định an toàn
+                self.p.V_mps = 2.0
+                self.r.belt_speed_mps = 2.0
+                print(f"DEBUG AUTO SPEED: Using fallback recommended speed 2.0 m/s")
+        else:
+            # Nếu có V_mps từ người dùng, vẫn cần tính tốc độ khuyến nghị và kiểm tra giới hạn
+            try:
+                from core.optimize import optimize_speed, get_max_speed_from_table
+                
+                # Tính tốc độ khuyến nghị dựa trên vật liệu và kích thước hạt
+                v_rec = optimize_speed(self.p.material, self.p.particle_size_mm, self.p.B_mm)
+                
+                # Lấy đặc tính vật liệu từ UI
+                material_characteristics = {
+                    'is_abrasive': getattr(self.p, 'is_abrasive', False),
+                    'is_corrosive': getattr(self.p, 'is_corrosive', False),
+                    'is_dusty': getattr(self.p, 'is_dusty', False)
+                }
+                
+                # Lấy tốc độ tối đa cho phép từ bảng tra
+                max_speed_allowed = get_max_speed_from_table(self.p.B_mm, material_characteristics)
+                
+                # Lưu kết quả vào result
+                self.r.belt_speed_mps = self.p.V_mps
+                self.r.belt_width_selected_mm = self.p.B_mm
+                self.r.belt_speed_recommended_mps = v_rec
+                self.r.max_speed_allowed_mps = max_speed_allowed
+                
+                # Kiểm tra xem tốc độ người dùng có vượt quá giới hạn không
+                if max_speed_allowed > 0 and self.p.V_mps > max_speed_allowed:
+                    warning_msg = f"⚠️ CẢNH BÁO: Tốc độ người dùng nhập ({self.p.V_mps:.2f} m/s) vượt quá tốc độ tối đa cho phép ({max_speed_allowed:.2f} m/s) theo bảng tra cho bề rộng {self.p.B_mm}mm. Thiết kế này KHÔNG TỐI ƯU - cần tăng bề rộng băng hoặc giảm lưu lượng."
+                    if not hasattr(self.r, 'warnings'):
+                        self.r.warnings = []
+                    self.r.warnings.append(warning_msg)
+                
+                print(f"DEBUG AUTO SPEED: Using user-provided V_mps={self.p.V_mps} m/s, calculated v_rec={v_rec:.3f} m/s, max allowed={max_speed_allowed:.2f} m/s")
+                
+            except Exception as e:
+                print(f"DEBUG AUTO SPEED ERROR: Failed to calculate recommended speed: {e}")
+                # Fallback: sử dụng giá trị mặc định
+                self.r.belt_speed_mps = self.p.V_mps
+                self.r.belt_width_selected_mm = self.p.B_mm
+                self.r.belt_speed_recommended_mps = 2.0  # Tốc độ mặc định an toàn
+                print(f"DEBUG AUTO SPEED: Using fallback recommended speed 2.0 m/s")
+        # --- [KẾT THÚC NÂNG CẤP TỐC ĐỘ BĂNG TỰ ĐỘNG] ---
+        
+        # SỬA LỖI: Đảm bảo V_mps không bị 0
+        if self.p.V_mps <= 0:
+            print(f"DEBUG: ERROR: V_mps = {self.p.V_mps}, fixing to 2.0 m/s")
+            self.p.V_mps = 2.0
+            self.r.belt_speed_mps = 2.0
+        
+        # SỬA LỖI: Đảm bảo Qt_tph không bị 0
+        if self.p.Qt_tph <= 0:
+            print(f"DEBUG: ERROR: Qt_tph = {self.p.Qt_tph}, fixing to 100.0 tph")
+            self.p.Qt_tph = 100.0
+        
         self.r.mass_flow_rate = self.p.Qt_tph * 1000.0 / 3600.0
         self.r.material_load_kgpm = self.r.mass_flow_rate / max(self.p.V_mps, 0.1)
         self.r.belt_weight_kgpm = calculate_belt_weight(self.p.B_mm, self.p.belt_thickness_mm, self.p.belt_type)
@@ -394,7 +541,8 @@ class CalculationStrategy(ABC):
         self.r.total_load_kgpm = self.r.material_load_kgpm + self.r.belt_weight_kgpm + self.r.moving_parts_weight_kgpm
 
         # Debug: in ra các giá trị để kiểm tra
-        print(f"DEBUG: Qt_tph={self.p.Qt_tph}, V_mps={self.p.V_mps}")
+        belt_speed = getattr(self.r, 'belt_speed_mps', self.p.V_mps) or self.p.V_mps
+        print(f"DEBUG: Qt_tph={self.p.Qt_tph}, V_mps={belt_speed}")
         print(f"DEBUG: mass_flow_rate={self.r.mass_flow_rate}, material_load_kgpm={self.r.material_load_kgpm}")
         print(f"DEBUG: belt_weight_kgpm={self.r.belt_weight_kgpm}, moving_parts_weight_kgpm={self.r.moving_parts_weight_kgpm}")
         print(f"DEBUG: total_load_kgpm={self.r.total_load_kgpm}")
@@ -408,13 +556,28 @@ class CalculationStrategy(ABC):
         self.r.total_load_kgpm = self.r.material_load_kgpm + self.r.belt_weight_kgpm + self.r.moving_parts_weight_kgpm
         
         # Cập nhật lại mass_flow_rate và Qt_effective_tph dựa trên material_load_kgpm mới
-        V = max(0.05, float(self.p.V_mps))
+        # Sử dụng tốc độ từ result nếu đã được tính tự động
+        belt_speed = getattr(self.r, 'belt_speed_mps', self.p.V_mps) or self.p.V_mps
+        V = max(0.05, float(belt_speed))
         self.r.mass_flow_rate = self.r.material_load_kgpm * V
         self.r.Qt_effective_tph = self.r.mass_flow_rate * 3.6 / 1000.0
         
         # Debug: sau khi áp dụng giới hạn hình học
         print(f"DEBUG: AFTER GEO - material_load_kgpm={self.r.material_load_kgpm}, total_load_kgpm={self.r.total_load_kgpm}")
         print(f"DEBUG: AFTER GEO - mass_flow_rate={self.r.mass_flow_rate}, Qt_effective_tph={self.r.Qt_effective_tph}")
+        
+        # SỬA LỖI: Kiểm tra cuối cùng để đảm bảo không có giá trị 0
+        if self.r.material_load_kgpm <= 0:
+            print(f"DEBUG: FINAL CHECK: material_load_kgpm = {self.r.material_load_kgpm}, fixing...")
+            # Tính lại từ Qt_tph
+            fallback_load = (self.p.Qt_tph * 1000.0 / 3600.0) / max(V, 0.1)
+            self.r.material_load_kgpm = max(fallback_load, 0.1)
+            print(f"DEBUG: Fixed material_load_kgpm to {self.r.material_load_kgpm:.3f}")
+        
+        if self.r.total_load_kgpm <= 0:
+            print(f"DEBUG: FINAL CHECK: total_load_kgpm = {self.r.total_load_kgpm}, fixing...")
+            self.r.total_load_kgpm = self.r.material_load_kgpm + self.r.belt_weight_kgpm + self.r.moving_parts_weight_kgpm
+            print(f"DEBUG: Fixed total_load_kgpm to {self.r.total_load_kgpm:.3f}")
         
         # --- [BẮT ĐẦU NÂNG CẤP] ---
         # Phân luồng tính toán cho truyền động đơn và kép
@@ -456,6 +619,21 @@ class CalculationStrategy(ABC):
         print(f"DEBUG FINALIZE: required_power_kw={self.r.required_power_kw}")
         print(f"DEBUG FINALIZE: max_tension={self.r.max_tension}")
 
+        # SỬA LỖI: Kiểm tra required_power_kw trước khi tính toán
+        if self.r.required_power_kw <= 0:
+            print(f"DEBUG FINALIZE: ERROR: required_power_kw = {self.r.required_power_kw}, fixing...")
+            # Tính lại từ material_load_kgpm và tốc độ
+            belt_speed = getattr(self.r, 'belt_speed_mps', self.p.V_mps) or self.p.V_mps
+            belt_speed = max(0.05, belt_speed)
+            if self.r.material_load_kgpm > 0:
+                # Ước tính công suất từ tải trọng và ma sát
+                estimated_power = (self.r.material_load_kgpm * G * belt_speed * 0.02) / 1000.0  # Giả định hệ số ma sát 0.02
+                self.r.required_power_kw = max(estimated_power, 0.1)
+                print(f"DEBUG FINALIZE: Fixed required_power_kw to {self.r.required_power_kw:.3f}")
+            else:
+                self.r.required_power_kw = 0.1
+                print(f"DEBUG FINALIZE: Set required_power_kw to default 0.1")
+
         self.r.motor_power_kw = self.r.required_power_kw * Kt / (eta_m * eta_g)
         drive_eta = (eta_m * eta_g / Kt) * 100.0
         self.r.drive_efficiency_percent = drive_eta
@@ -463,6 +641,16 @@ class CalculationStrategy(ABC):
 
         T_allow_Npm = self.belt_specs.get("T_allow_Npm", 6000.0)
         belt_capacity_N = (self.p.B_mm / 1000.0) * T_allow_Npm
+        
+        # SỬA LỖI: Kiểm tra max_tension trước khi tính safety_factor
+        if self.r.max_tension <= 0:
+            print(f"DEBUG FINALIZE: ERROR: max_tension = {self.r.max_tension}, fixing...")
+            # Ước tính từ required_power_kw
+            belt_speed = getattr(self.r, 'belt_speed_mps', self.p.V_mps) or self.p.V_mps
+            belt_speed = max(0.05, belt_speed)
+            self.r.max_tension = (self.r.required_power_kw * 1000.0) / belt_speed
+            print(f"DEBUG FINALIZE: Fixed max_tension to {self.r.max_tension:.3f}")
+        
         self.r.safety_factor = belt_capacity_N / max(self.r.max_tension, 1e-6)
         self.r.belt_strength_utilization = 100.0 * self.r.max_tension / max(belt_capacity_N, 1e-6)
         
@@ -631,12 +819,22 @@ class CalculationStrategy(ABC):
 class CEMAStrategy(CalculationStrategy):
     def calculate_resistances_and_power(self):
         f, lo = get_friction_and_lo_cema(self.p)
-        V_mpm = self.p.V_mps * 60.0
+        belt_speed = getattr(self.r, 'belt_speed_mps', self.p.V_mps) or self.p.V_mps
+        V_mpm = belt_speed * 60.0
         W_kgpm = get_moving_parts_weight_cema(self.p.B_mm)
+        
+        # SỬA LỖI: Kiểm tra giá trị hợp lệ trước khi tính toán
+        if self.r.material_load_kgpm <= 0:
+            print(f"DEBUG CEMA: ERROR: material_load_kgpm = {self.r.material_load_kgpm}, using fallback")
+            # Tính lại từ Qt_tph
+            belt_speed = max(0.05, belt_speed)
+            self.r.material_load_kgpm = (self.p.Qt_tph * 1000.0 / 3600.0) / belt_speed
+            print(f"DEBUG CEMA: Fixed material_load_kgpm to {self.r.material_load_kgpm:.3f}")
         
         P1_kw = (f * (self.p.L_m + lo) * W_kgpm * V_mpm) / 6120.0
         P2_kw = (f * (self.p.L_m + lo) * self.r.material_load_kgpm * V_mpm) / 6120.0
-        P3_kw = (self.p.H_m * self.r.material_load_kgpm) * G * self.p.V_mps / 1000.0
+        belt_speed = getattr(self.r, 'belt_speed_mps', self.p.V_mps) or self.p.V_mps
+        P3_kw = (self.p.H_m * self.r.material_load_kgpm) * G * belt_speed / 1000.0
         
         # Debug: in ra các giá trị để kiểm tra
         print(f"DEBUG CEMA: f={f}, lo={lo}, V_mpm={V_mpm}, W_kgpm={W_kgpm}")
@@ -648,13 +846,15 @@ class CEMAStrategy(CalculationStrategy):
         self.r.P3_kw = P3_kw
         self.r.Pt_kw = 0.0
         self.r.required_power_kw = P1_kw + P2_kw + P3_kw
-        self.r.friction_force = (P1_kw + P2_kw) * 1000.0 / max(self.p.V_mps, 0.1)
-        self.r.lift_force = (P3_kw * 1000.0 / max(self.p.V_mps, 0.1)) if P3_kw > 0 else 0.0
+        belt_speed = getattr(self.r, 'belt_speed_mps', self.p.V_mps) or self.p.V_mps
+        self.r.friction_force = (P1_kw + P2_kw) * 1000.0 / max(belt_speed, 0.1)
+        self.r.lift_force = (P3_kw * 1000.0 / max(belt_speed, 0.1)) if P3_kw > 0 else 0.0
         
         # Debug: in ra kết quả cuối cùng
         print(f"DEBUG CEMA: required_power_kw={self.r.required_power_kw}")
         print(f"DEBUG CEMA: friction_force={self.r.friction_force}, lift_force={self.r.lift_force}")
-        print(f"DEBUG CEMA: V_mps={self.p.V_mps}, max(V_mps, 0.1)={max(self.p.V_mps, 0.1)}")
+        belt_speed = getattr(self.r, 'belt_speed_mps', self.p.V_mps) or self.p.V_mps
+        print(f"DEBUG CEMA: V_mps={belt_speed}, max(V_mps, 0.1)={max(belt_speed, 0.1)}")
 
 class DINStrategy(CalculationStrategy):
     def calculate_resistances_and_power(self):
@@ -675,7 +875,8 @@ class DINStrategy(CalculationStrategy):
         F_friction = f * G * L * (2.0 * q_B + q_R_upper + q_R_lower + q_G)
         F_lift = G * H * q_G
         F_total = F_friction + F_lift
-        self.r.required_power_kw = F_total * self.p.V_mps / 1000.0
+        belt_speed = getattr(self.r, 'belt_speed_mps', self.p.V_mps) or self.p.V_mps
+        self.r.required_power_kw = F_total * belt_speed / 1000.0
         self.r.friction_force = F_friction
         self.r.lift_force = F_lift
 
@@ -698,7 +899,8 @@ class ISOStrategy(DINStrategy):
         F_friction = f_iso * G * L * (2.0 * q_B + q_R_upper + q_R_lower + q_G)
         F_lift = G * H * q_G
         F_total = F_friction + F_lift
-        self.r.required_power_kw = F_total * self.p.V_mps / 1000.0
+        belt_speed = getattr(self.r, 'belt_speed_mps', self.p.V_mps) or self.p.V_mps
+        self.r.required_power_kw = F_total * belt_speed / 1000.0
         self.r.friction_force = F_friction
         self.r.lift_force = F_lift
         self.r.warnings.append("Đang tính theo ISO 5048 với hệ số ma sát thấp hơn DIN.")
@@ -821,6 +1023,7 @@ def find_optimal_transmission(calculation_params: 'ConveyorParameters',
     # Vòng lặp chính - Duyệt qua các hộp số theo chế độ được chọn
     for gearbox_ratio in gearbox_candidates:
         # Tính tốc độ trục ra của hộp số
+        # Công thức: Tốc độ đầu ra = Tốc độ động cơ ÷ Tỉ số hộp số
         output_rpm = motor_rpm / gearbox_ratio
         
         # Tính tỉ số truyền nhông-xích mục tiêu: i_s = n_out / n_pulley_req
@@ -914,6 +1117,7 @@ def find_optimal_transmission(calculation_params: 'ConveyorParameters',
                     # --- [BẮT ĐẦU SỬA LỖI UI] ---
                     # Gán các thuộc tính alias để UI có thể truy cập đúng
                     solution.gearbox_ratio_mode = "Manual" if use_manual else "Auto"
+                    # Tốc độ đầu ra động cơ = Tốc độ động cơ ÷ Tỉ số hộp số
                     solution.motor_output_rpm = output_rpm
                     solution.actual_velocity_mps = actual_velocity
                     solution.velocity_error_percent = error

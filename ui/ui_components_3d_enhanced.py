@@ -16,10 +16,10 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QComboBox,
     QDoubleSpinBox, QSpinBox, QLineEdit, QPushButton, QScrollArea, QFrame,
     QTableWidget, QTableWidgetItem, QTextEdit, QTabWidget, QProgressBar, QLabel,
-    QCheckBox, QStackedWidget, QSlider
+    QCheckBox, QStackedWidget, QSlider, QGridLayout
 )
 from PySide6.QtSvgWidgets import QSvgWidget
-from PySide6.QtGui import QPixmap, QFont
+from PySide6.QtGui import QPixmap, QFont, QColor
 
 # 2D plotting
 from .plotting import EnhancedPlotCanvas
@@ -241,27 +241,22 @@ class InputsPanel(QWidget):
         self.btn_calc.setObjectName("primary")
         self.btn_calc.setMinimumHeight(50)  # Đảm bảo nút có chiều cao tối thiểu
         self.btn_calc.setStyleSheet("""
-            QPushButton {
-                background-color: #3b82f6;
+            QPushButton#primary {
+                background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #049b94, stop:1 #037d77);
                 color: white;
-                border: 2px solid #3b82f6;
+                border: none;
                 border-radius: 8px;
-                padding: 8px 16px;
-                font-weight: 700;
-                font-size: 13px;
-                min-height: 50px;
-                min-width: 140px;
-                margin: 5px;
+                padding: 12px 24px;
+                font-weight: bold;
+                font-size: 14px;
                 text-align: center;
                 white-space: pre-line;
             }
-            QPushButton:hover {
-                background-color: #2563eb;
-                border-color: #2563eb;
+            QPushButton#primary:hover {
+                background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #05a89f, stop:1 #048a82);
             }
-            QPushButton:pressed {
-                background-color: #1d4ed8;
-                border-color: #1d4ed8;
+            QPushButton#primary:pressed {
+                background-color: #024e4a;
             }
         """)
         
@@ -387,9 +382,9 @@ class InputsPanel(QWidget):
         self.spn_particle = QDoubleSpinBox(); self.spn_particle.setRange(0.1, 500); self.spn_particle.setValue(25); self.spn_particle.setSuffix(" mm")
         self.spn_angle = QDoubleSpinBox(); self.spn_angle.setRange(10, 50); self.spn_angle.setValue(35); self.spn_angle.setSuffix(" °")
         self.spn_temp = QDoubleSpinBox(); self.spn_temp.setRange(-40, 200); self.spn_temp.setValue(20); self.spn_temp.setSuffix(" °C")
-        self.chk_abrasive = QCheckBox("Vật liệu mài mòn")
-        self.chk_corrosive = QCheckBox("Vật liệu ăn mòn")
-        self.chk_dusty = QCheckBox("Vật liệu bụi")
+        self.chk_abrasive = QCheckBox("Granular materials")
+        self.chk_corrosive = QCheckBox("Coal and abrasive materials")
+        self.chk_dusty = QCheckBox("Hard ores, rocks and materials with sharp edges")
 
         # Operating
         self.cbo_standard = QComboBox(); self.cbo_standard.addItems(["CEMA", "DIN 22101", "ISO 5048"])
@@ -397,7 +392,10 @@ class InputsPanel(QWidget):
         self.spn_length = QDoubleSpinBox(); self.spn_length.setRange(1, 5000); self.spn_length.setValue(120); self.spn_length.setSuffix(" m")
         self.spn_height = QDoubleSpinBox(); self.spn_height.setRange(-100, 500); self.spn_height.setValue(25); self.spn_height.setSuffix(" m")
         self.spn_incl = QDoubleSpinBox(); self.spn_incl.setRange(-30, 30); self.spn_incl.setValue(0); self.spn_incl.setSuffix(" °")
-        self.spn_speed = QDoubleSpinBox(); self.spn_speed.setRange(0.1, 15.0); self.spn_speed.setDecimals(2); self.spn_speed.setValue(2.5); self.spn_speed.setSuffix(" m/s")
+        # Tốc độ băng giờ đây được tính tự động - không cần nhập tay
+        self.lbl_speed_info = QLabel("🚀 Tốc độ băng sẽ được tính tự động dựa trên lưu lượng và bề rộng")
+        self.lbl_speed_info.setStyleSheet("color: #059669; font-style: italic; padding: 8px; background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 4px;")
+        self.lbl_speed_info.setWordWrap(True)
         self.spn_hours = QSpinBox(); self.spn_hours.setRange(1, 24); self.spn_hours.setValue(16); self.spn_hours.setSuffix(" giờ/ngày")
 
         # Belt
@@ -439,6 +437,7 @@ class InputsPanel(QWidget):
         self.spn_gearbox_ratio_user.setSuffix("")
         self.spn_gearbox_ratio_user.setObjectName("gearbox_ratio_input")
         self.spn_gearbox_ratio_user.setEnabled(False)  # Mặc định disable khi Auto
+        self.spn_gearbox_ratio_user.setToolTip("Chuyển chế độ hộp số sang Chỉ định, nếu i=1/10 thì nhập vào 10")
         
         # Kết nối signal để enable/disable input
         self.cbo_gearbox_ratio_mode.currentTextChanged.connect(self._on_gearbox_mode_changed)
@@ -514,9 +513,138 @@ class InputsPanel(QWidget):
         f.addRow("Kích thước hạt:", self.spn_particle)
         f.addRow("Góc nghiêng tự nhiên:", self.spn_angle)
         f.addRow("Nhiệt độ vật liệu:", self.spn_temp)
-        box = QHBoxLayout()
-        box.addWidget(self.chk_abrasive); box.addWidget(self.chk_corrosive); box.addWidget(self.chk_dusty); box.addStretch(1)
-        f.addRow("Đặc tính:", box)
+        # Tạo layout dọc cho các checkbox để hiển thị rõ ràng hơn
+        checkbox_container = QWidget()
+        checkbox_layout = QVBoxLayout(checkbox_container)
+        checkbox_layout.setSpacing(8)
+        checkbox_layout.setContentsMargins(10, 5, 10, 5)
+        
+        # Thêm tiêu đề cho nhóm checkbox
+        checkbox_title = QLabel("Chọn đặc tính vật liệu:")
+        checkbox_title.setStyleSheet("""
+            QLabel {
+                font-weight: 600;
+                color: #374151;
+                font-size: 13px;
+                margin-bottom: 5px;
+            }
+        """)
+        checkbox_layout.addWidget(checkbox_title)
+        
+        # Thêm các checkbox với styling cải tiến
+        self.chk_abrasive.setStyleSheet("""
+            QCheckBox {
+                font-size: 12px;
+                font-weight: 500;
+                color: #374151;
+                spacing: 8px;
+                padding: 6px 10px;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                background-color: #f9fafb;
+                min-width: 200px;
+            }
+            QCheckBox:hover {
+                border-color: #9ca3af;
+                background-color: #f3f4f6;
+            }
+            QCheckBox:checked {
+                border-color: #3b82f6;
+                background-color: #eff6ff;
+                color: #1e40af;
+            }
+            QCheckBox::indicator {
+                width: 16px;
+                height: 16px;
+                border-radius: 3px;
+                border: 2px solid #d1d5db;
+                background-color: #ffffff;
+            }
+            QCheckBox::indicator:checked {
+                border-color: #3b82f6;
+                background-color: #3b82f6;
+            }
+        """)
+        
+        self.chk_corrosive.setStyleSheet("""
+            QCheckBox {
+                font-size: 12px;
+                font-weight: 500;
+                color: #374151;
+                spacing: 8px;
+                padding: 6px 10px;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                background-color: #f9fafb;
+                min-width: 200px;
+            }
+            QCheckBox:hover {
+                border-color: #9ca3af;
+                background-color: #f3f4f6;
+            }
+            QCheckBox:checked {
+                border-color: #3b82f6;
+                background-color: #eff6ff;
+                color: #1e40af;
+            }
+            QCheckBox::indicator {
+                width: 16px;
+                height: 16px;
+                border-radius: 3px;
+                border: 2px solid #d1d5db;
+                background-color: #ffffff;
+            }
+            QCheckBox::indicator:checked {
+                border-color: #3b82f6;
+                background-color: #3b82f6;
+            }
+        """)
+        
+        self.chk_dusty.setStyleSheet("""
+            QCheckBox {
+                font-size: 12px;
+                font-weight: 500;
+                color: #374151;
+                spacing: 8px;
+                padding: 6px 10px;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                background-color: #f9fafb;
+                min-width: 200px;
+            }
+            QCheckBox:hover {
+                border-color: #9ca3af;
+                background-color: #f3f4f6;
+            }
+            QCheckBox:checked {
+                border-color: #3b82f6;
+                background-color: #eff6ff;
+                color: #1e40af;
+            }
+            QCheckBox::indicator {
+                width: 16px;
+                height: 16px;
+                border-radius: 3px;
+                border: 2px solid #d1d5db;
+                background-color: #ffffff;
+            }
+            QCheckBox::indicator:checked {
+                border-color: #3b82f6;
+                background-color: #3b82f6;
+            }
+        """)
+        
+        # Thêm tooltip giải thích cho từng checkbox
+        self.chk_abrasive.setToolTip("Chọn nếu vật liệu có dạng hạt nhỏ như cát, xi măng, bột...")
+        self.chk_corrosive.setToolTip("Chọn nếu vật liệu có tính ăn mòn như than mỏ, muối, hóa chất...")
+        self.chk_dusty.setToolTip("Chọn nếu vật liệu cứng, có cạnh sắc như quặng, đá, kim loại...")
+        
+        # Thêm các checkbox vào layout
+        checkbox_layout.addWidget(self.chk_abrasive)
+        checkbox_layout.addWidget(self.chk_corrosive)
+        checkbox_layout.addWidget(self.chk_dusty)
+        
+        f.addRow("Đặc tính vật liệu:", checkbox_container)
         return g
 
     def _operating_group(self) -> QGroupBox:
@@ -527,7 +655,7 @@ class InputsPanel(QWidget):
         f.addRow("Chiều dài:", self.spn_length)
         f.addRow("Độ cao nâng:", self.spn_height)
         f.addRow("Góc nghiêng:", self.spn_incl)
-        f.addRow("Tốc độ băng:", self.spn_speed)
+        f.addRow(self.lbl_speed_info)
         f.addRow("Giờ vận hành/ngày:", self.spn_hours)
         return g
 
@@ -712,11 +840,13 @@ class CardsRow(QWidget):
     def __init__(self) -> None:
         super().__init__()
         lay = QHBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
+        self.card_speed = QFrame(); self.card_speed.setObjectName("card")
         self.card_power = QFrame(); self.card_power.setObjectName("card")
         self.card_eff = QFrame(); self.card_eff.setObjectName("card")
         self.card_sf = QFrame(); self.card_sf.setObjectName("card")
         self.card_cost = QFrame(); self.card_cost.setObjectName("card")
         for c, title, sub in [
+            (self.card_speed, "TỐC ĐỘ BĂNG TẢI", "m/s"),
             (self.card_power, "CÔNG SUẤT ĐỘNG CƠ", "kW tại trục"),
             (self.card_eff, "HIỆU SUẤT HỆ THỐNG", "Phần trăm"),
             (self.card_sf, "HỆ SỐ AN TOÀN", "SF hiện tại"),
@@ -747,7 +877,14 @@ class Enhanced3DResultsPanel(QWidget):
         # Cải thiện giao diện tổng thể của results panel
         self.setStyleSheet("""
             QWidget {
-                background-color: #ffffff;
+                background-color: #f8fafc; /* Màu nền chung */
+            }
+            QLabel#tabTitle {
+                font-size: 16px;
+                font-weight: bold;
+                color: #1e3a8a; /* Xanh đậm */
+                padding: 5px 0px;
+                margin-bottom: 5px;
             }
             QTabWidget::pane {
                 border: 1px solid #e2e8f0;
@@ -757,7 +894,7 @@ class Enhanced3DResultsPanel(QWidget):
             QTabBar::tab {
                 background-color: #f1f5f9;
                 color: #475569;
-                padding: 8px 16px;
+                padding: 10px 20px;
                 margin-right: 2px;
                 border-top-left-radius: 6px;
                 border-top-right-radius: 6px;
@@ -774,18 +911,20 @@ class Enhanced3DResultsPanel(QWidget):
             QTableWidget {
                 gridline-color: #e5e7eb;
                 background-color: #ffffff;
-                alternate-background-color: #f8fafc;
-                selection-background-color: #3b82f6;
-                selection-color: #ffffff;
+                alternate-background-color: #f9fafb; /* Màu xen kẽ nhạt hơn */
+                selection-background-color: #dbeafe; /* Xanh nhạt khi chọn */
+                selection-color: #1e3a8a;
                 border: 1px solid #e2e8f0;
-                border-radius: 4px;
+                border-radius: 6px;
+                padding: 5px;
             }
             QHeaderView::section {
-                background-color: #1e40af;
-                color: #ffffff;
-                padding: 8px;
+                background-color: #f1f5f9; /* Màu header nhạt */
+                color: #1e3a8a;
+                padding: 10px;
                 border: none;
                 font-weight: bold;
+                border-bottom: 2px solid #3b82f6;
             }
             QTextEdit {
                 border: 1px solid #e2e8f0;
@@ -805,6 +944,39 @@ class Enhanced3DResultsPanel(QWidget):
             QProgressBar::chunk {
                 background-color: #3b82f6;
                 border-radius: 3px;
+            }
+            QGroupBox {
+                font-weight: bold;
+                font-size: 14px;
+                border: 1px solid #d1d5db;
+                border-radius: 8px;
+                margin-top: 10px;
+                padding: 15px;
+                background-color: #ffffff;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 15px;
+                padding: 0 5px 0 5px;
+                color: #1e3a8a;
+            }
+            /* Style cho các label hiển thị giá trị trong tab cấu trúc */
+            QLabel.valueLabel {
+                font-family: 'Segoe UI', sans-serif;
+                font-size: 12px;
+                font-weight: bold;
+                color: #1d4ed8; /* Xanh đậm hơn */
+                padding: 6px;
+                background-color: #eff6ff;
+                border-radius: 4px;
+                border: 1px solid #dbeafe;
+                min-width: 80px;
+                qproperty-alignment: 'AlignCenter';
+            }
+            /* Style cho các label tiêu đề trong tab cấu trúc */
+            QLabel.labelTitle {
+                font-weight: 500;
+                color: #374151;
             }
         """)
         # --- [KẾT THÚC NÂNG CẤP UI] ---
@@ -830,7 +1002,13 @@ class Enhanced3DResultsPanel(QWidget):
         # --- [KẾT THÚC NÂNG CẤP TỐI ƯU HÓA]
 
         # Tab Tổng quan
-        w_over = QWidget(); lo = QVBoxLayout(w_over)
+        w_over = QWidget()
+        lo = QVBoxLayout(w_over)
+        # --- [BẮT ĐẦU NÂNG CẤP UI] ---
+        title_overview = QLabel("Bảng thông số chi tiết")
+        title_overview.setObjectName("tabTitle")
+        lo.addWidget(title_overview)
+        # --- [KẾT THÚC NÂNG CẤP UI] ---
         self.tbl = QTableWidget(); self.tbl.setColumnCount(2)
         self.tbl.setHorizontalHeaderLabels(["Thông số", "Giá trị"])
         self.tbl.horizontalHeader().setStretchLastSection(True)
@@ -840,154 +1018,81 @@ class Enhanced3DResultsPanel(QWidget):
         # Tab Cấu trúc (Puly & Con lăn)
         w_struct = QWidget()
         l_struct = QVBoxLayout(w_struct)
+        l_struct.setSpacing(15)
         
         # --- [BẮT ĐẦU NÂNG CẤP UI] ---
-        # Cải thiện styling cho tab Cấu trúc đề xuất
-        w_struct.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                font-size: 14px;
-                border: 2px solid #3b82f6;
-                border-radius: 8px;
-                margin-top: 10px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-                color: #1e40af;
-            }
-        """)
-        # --- [KẾT THÚC NÂNG CẤP UI] ---
-        
-        g_pulleys = QGroupBox("Đề xuất Puly")
+        g_pulleys = QGroupBox("⚙️ Đề xuất Puly")
         l_pulleys = QVBoxLayout(g_pulleys)
         self.tbl_pulleys = QTableWidget()
         self.tbl_pulleys.setColumnCount(2)
         self.tbl_pulleys.setHorizontalHeaderLabels(["Loại Puly", "Đường kính đề xuất (mm)"])
         self.tbl_pulleys.horizontalHeader().setStretchLastSection(True)
-        # --- [BẮT ĐẦU NÂNG CẤP UI] ---
-        # Cải thiện styling cho bảng Puly
-        self.tbl_pulleys.setStyleSheet("""
-            QTableWidget {
-                gridline-color: #e5e7eb;
-                background-color: #ffffff;
-                alternate-background-color: #f8fafc;
-                selection-background-color: #3b82f6;
-                selection-color: #ffffff;
-            }
-            QHeaderView::section {
-                background-color: #1e40af;
-                color: #ffffff;
-                padding: 8px;
-                border: none;
-                font-weight: bold;
-            }
-        """)
-        # --- [KẾT THÚC NÂNG CẤP UI] ---
         l_pulleys.addWidget(self.tbl_pulleys)
         
-        g_idlers = QGroupBox("Đề xuất Con lăn & Khoảng cách")
+        g_idlers = QGroupBox("📏 Đề xuất Con lăn & Khoảng cách")
         f_idlers = QFormLayout(g_idlers)
-        # --- [BẮT ĐẦU NÂNG CẤP UI] ---
-        # Cải thiện styling cho labels
-        label_style = "font-family: 'Segoe UI'; font-size: 12px; font-weight: bold; color: #1e40af; padding: 5px; background-color: #eff6ff; border-radius: 4px;"
-        # --- [KẾT THÚC NÂNG CẤP UI] ---
-        self.lbl_spacing_carry = QLabel("---"); self.lbl_spacing_carry.setStyleSheet(label_style)
-        self.lbl_spacing_return = QLabel("---"); self.lbl_spacing_return.setStyleSheet(label_style)
-        self.lbl_transition_dist = QLabel("---"); self.lbl_transition_dist.setStyleSheet(label_style)
-        f_idlers.addRow("Khoảng cách con lăn nhánh tải:", self.lbl_spacing_carry)
-        f_idlers.addRow("Khoảng cách con lăn nhánh về:", self.lbl_spacing_return)
-        f_idlers.addRow("Khoảng cách chuyển tiếp (tối thiểu):", self.lbl_transition_dist)
+        f_idlers.setRowWrapPolicy(QFormLayout.WrapAllRows)
+        self.lbl_spacing_carry = QLabel("---"); self.lbl_spacing_carry.setObjectName("valueLabel")
+        self.lbl_spacing_return = QLabel("---"); self.lbl_spacing_return.setObjectName("valueLabel")
+        self.lbl_transition_dist = QLabel("---"); self.lbl_transition_dist.setObjectName("valueLabel")
+        f_idlers.addRow(QLabel("Khoảng cách con lăn nhánh tải:", objectName="labelTitle"), self.lbl_spacing_carry)
+        f_idlers.addRow(QLabel("Khoảng cách con lăn nhánh về:", objectName="labelTitle"), self.lbl_spacing_return)
+        f_idlers.addRow(QLabel("Khoảng cách chuyển tiếp (tối thiểu):", objectName="labelTitle"), self.lbl_transition_dist)
+        
+
+        
+        g_transmission = QGroupBox("🔗 Bộ truyền động hoàn chỉnh")
+        grid_transmission = QGridLayout(g_transmission)
+        grid_transmission.setSpacing(12)
+        
+        self.lbl_gearbox_mode = QLabel("---"); self.lbl_gearbox_mode.setObjectName("valueLabel")
+        self.lbl_gearbox_ratio_used = QLabel("---"); self.lbl_gearbox_ratio_used.setObjectName("valueLabel")
+        self.lbl_motor_output_rpm = QLabel("---"); self.lbl_motor_output_rpm.setObjectName("valueLabel")
+        self.lbl_motor_output_rpm.setToolTip(
+            "<b>Tốc độ đầu ra động cơ (vòng/phút)</b><br>"
+            "Tốc độ quay của trục đầu ra động cơ sau khi qua hộp số giảm tốc.<br><br>"
+            "<u>Công thức tính:</u> Tốc độ đầu ra = Tốc độ động cơ ÷ Tỉ số hộp số"
+        )
+        self.lbl_gearbox_ratio = QLabel("---"); self.lbl_gearbox_ratio.setObjectName("valueLabel")
+        self.lbl_chain_designation = QLabel("---"); self.lbl_chain_designation.setObjectName("valueLabel")
+        self.lbl_sprocket_teeth = QLabel("---"); self.lbl_sprocket_teeth.setObjectName("valueLabel")
+        self.lbl_actual_velocity = QLabel("---"); self.lbl_actual_velocity.setObjectName("valueLabel")
+        self.lbl_velocity_error = QLabel("---"); self.lbl_velocity_error.setObjectName("valueLabel")
+        self.lbl_total_ratio = QLabel("---"); self.lbl_total_ratio.setObjectName("valueLabel")
+        self.lbl_required_force = QLabel("---"); self.lbl_required_force.setObjectName("valueLabel")
+        self.lbl_allowable_force = QLabel("---"); self.lbl_allowable_force.setObjectName("valueLabel")
+        self.lbl_safety_margin = QLabel("---"); self.lbl_safety_margin.setObjectName("valueLabel")
+        self.lbl_chain_weight = QLabel("---"); self.lbl_chain_weight.setObjectName("valueLabel")
+
+        # Bố cục lưới cho dễ nhìn
+        grid_transmission.addWidget(QLabel("Tốc độ ra động cơ (rpm):", objectName="labelTitle"), 0, 0)
+        grid_transmission.addWidget(self.lbl_motor_output_rpm, 0, 1)
+        grid_transmission.addWidget(QLabel("Mã xích (ANSI/ISO):", objectName="labelTitle"), 0, 2)
+        grid_transmission.addWidget(self.lbl_chain_designation, 0, 3)
+
+        grid_transmission.addWidget(QLabel("Số răng nhông (Dẫn/Bị dẫn):", objectName="labelTitle"), 1, 0)
+        grid_transmission.addWidget(self.lbl_sprocket_teeth, 1, 1)
+        grid_transmission.addWidget(QLabel("Vận tốc băng thực tế (m/s):", objectName="labelTitle"), 1, 2)
+        grid_transmission.addWidget(self.lbl_actual_velocity, 1, 3)
+
+        grid_transmission.addWidget(QLabel("Sai số vận tốc (%):", objectName="labelTitle"), 2, 0)
+        grid_transmission.addWidget(self.lbl_velocity_error, 2, 1)
+        grid_transmission.addWidget(QLabel("Hệ số an toàn xích:", objectName="labelTitle"), 2, 2)
+        grid_transmission.addWidget(self.lbl_safety_margin, 2, 3)
+        
+        grid_transmission.addWidget(QLabel("Lực kéo yêu cầu (kN):", objectName="labelTitle"), 3, 0)
+        grid_transmission.addWidget(self.lbl_required_force, 3, 1)
+        grid_transmission.addWidget(QLabel("Lực kéo cho phép (kN):", objectName="labelTitle"), 3, 2)
+        grid_transmission.addWidget(self.lbl_allowable_force, 3, 3)
+        
+        grid_transmission.setColumnStretch(1, 1)
+        grid_transmission.setColumnStretch(3, 1)
+
         l_struct.addWidget(g_pulleys)
         l_struct.addWidget(g_idlers)
-        
-        # Thêm khu vực hiển thị bộ truyền động hoàn chỉnh
-        g_transmission = QGroupBox("Bộ truyền động hoàn chỉnh")
-        # --- [BẮT ĐẦU NÂNG CẤP UI] ---
-        # Cải thiện styling cho bộ truyền động
-        g_transmission.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                font-size: 14px;
-                border: 2px solid #059669;
-                border-radius: 8px;
-                margin-top: 10px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-                color: #047857;
-            }
-        """)
-        # --- [KẾT THÚC NÂNG CẤP UI] ---
-        f_transmission = QFormLayout(g_transmission)
-        
-        # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
-        # Thông tin về chế độ hộp số
-        self.lbl_gearbox_mode = QLabel("---"); self.lbl_gearbox_mode.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        self.lbl_gearbox_ratio_used = QLabel("---"); self.lbl_gearbox_ratio_used.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
-        
-        # Label cho tốc độ đầu ra động cơ
-        self.lbl_motor_output_rpm = QLabel("---"); self.lbl_motor_output_rpm.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        
-        self.lbl_gearbox_ratio = QLabel("---"); self.lbl_gearbox_ratio.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        self.lbl_chain_designation = QLabel("---"); self.lbl_chain_designation.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        # --- [BẮT ĐẦU NÂNG CẤP UI] ---
-        # Gộp số răng nhông dẫn và bị dẫn thành một hàng
-        self.lbl_sprocket_teeth = QLabel("---"); self.lbl_sprocket_teeth.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        # --- [KẾT THÚC NÂNG CẤP UI] ---
-        self.lbl_actual_velocity = QLabel("---"); self.lbl_actual_velocity.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        self.lbl_velocity_error = QLabel("---"); self.lbl_velocity_error.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        self.lbl_total_ratio = QLabel("---"); self.lbl_total_ratio.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        
-        # --- [BẮT ĐẦU NÂNG CẤP THEO KẾ HOẠCH] ---
-        # Thêm các trường mới theo kế hoạch Plan C
-        self.lbl_required_force = QLabel("---"); self.lbl_required_force.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        self.lbl_allowable_force = QLabel("---"); self.lbl_allowable_force.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        self.lbl_safety_margin = QLabel("---"); self.lbl_safety_margin.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        self.lbl_chain_weight = QLabel("---"); self.lbl_chain_weight.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
-        
-        # --- [BẮT ĐẦU NÂNG CẤP UI] ---
-        # Cải thiện styling cho tất cả labels trong bộ truyền động
-        transmission_label_style = "font-family: 'Segoe UI'; font-size: 11px; font-weight: bold; color: #047857; padding: 6px; background-color: #ecfdf5; border-radius: 4px; border: 1px solid #d1fae5;"
-        
-        self.lbl_motor_output_rpm.setStyleSheet(transmission_label_style)
-        self.lbl_chain_designation.setStyleSheet(transmission_label_style)
-        self.lbl_sprocket_teeth.setStyleSheet(transmission_label_style)
-        self.lbl_actual_velocity.setStyleSheet(transmission_label_style)
-        self.lbl_velocity_error.setStyleSheet(transmission_label_style)
-        self.lbl_total_ratio.setStyleSheet(transmission_label_style)
-        self.lbl_required_force.setStyleSheet(transmission_label_style)
-        self.lbl_allowable_force.setStyleSheet(transmission_label_style)
-        self.lbl_safety_margin.setStyleSheet(transmission_label_style)
-        self.lbl_chain_weight.setStyleSheet(transmission_label_style)
-        # --- [KẾT THÚC NÂNG CẤP UI] ---
-        
-        f_transmission.addRow("Tốc độ đầu ra động cơ:", self.lbl_motor_output_rpm)
-        f_transmission.addRow("Mã xích (ANSI/ISO):", self.lbl_chain_designation)
-        # --- [BẮT ĐẦU NÂNG CẤP UI] ---
-        # Gộp số răng nhông dẫn và bị dẫn thành một hàng
-        f_transmission.addRow("Số răng nhông dẫn/Bị dẫn:", self.lbl_sprocket_teeth)
-        # --- [KẾT THÚC NÂNG CẤP UI] ---
-        f_transmission.addRow("Vận tốc băng tải (m/s):", self.lbl_actual_velocity)
-        f_transmission.addRow("Sai số vận tốc (%):", self.lbl_velocity_error)
-        
-        # --- [BẮT ĐẦU NÂNG CẤP THEO KẾ HOẠCH] ---
-        # Thêm các trường mới vào form
-        f_transmission.addRow("Lực kéo yêu cầu (kN):", self.lbl_required_force)
-        f_transmission.addRow("Lực kéo cho phép (kN):", self.lbl_allowable_force)
-        f_transmission.addRow("Hệ số an toàn:", self.lbl_safety_margin)
-        f_transmission.addRow("Trọng lượng xích (kg/m):", self.lbl_chain_weight)
-        # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
-        
         l_struct.addWidget(g_transmission)
         l_struct.addStretch(1)
+        # --- [KẾT THÚC NÂNG CẤP UI] ---
         self.tabs.addTab(w_struct, "🏗️ Cấu trúc đề xuất")
 
         # Tab Phân tích
@@ -1002,11 +1107,7 @@ class Enhanced3DResultsPanel(QWidget):
         lc.addWidget(self.txt_cost_analysis)
         self.tabs.addTab(w_cost, "💰 Phân tích Chi phí")
 
-        # Tab Tóm tắt
-        w_sum = QWidget(); ls = QVBoxLayout(w_sum)
-        self.txt_report = QTextEdit(); self.txt_report.setReadOnly(True)
-        ls.addWidget(self.txt_report)
-        self.tabs.addTab(w_sum, "📝 Tóm tắt")
+
 
         # Tab Visualization
         w_viz = QWidget(); viz_layout = QVBoxLayout(w_viz)
@@ -1024,11 +1125,152 @@ class Enhanced3DResultsPanel(QWidget):
 
         self.viz_stack = QStackedWidget()
         self.w_2d = QWidget(); l2d = QVBoxLayout(self.w_2d)
-        controls_2d = QGroupBox("Tùy chọn biểu đồ 2D"); c_lay = QHBoxLayout(controls_2d)
-        self.chk_t2 = QCheckBox("Lực căng T2"); self.chk_t2.setChecked(True)
-        self.chk_friction = QCheckBox("Lực ma sát"); self.chk_friction.setChecked(True)
-        self.chk_lift = QCheckBox("Lực nâng"); self.chk_lift.setChecked(True)
-        c_lay.addWidget(self.chk_t2); c_lay.addWidget(self.chk_friction); c_lay.addWidget(self.chk_lift); c_lay.addStretch(1)
+        
+        # --- [BẮT ĐẦU CẢI THIỆN GIAO DIỆN CHECKBOX] ---
+        controls_2d = QGroupBox("Tùy chọn biểu đồ 2D")
+        controls_2d.setStyleSheet("""
+            QGroupBox {
+                font-weight: 600;
+                font-size: 13px;
+                color: #374151;
+                border: 2px solid #e5e7eb;
+                border-radius: 10px;
+                margin-top: 10px;
+                padding-top: 15px;
+                background-color: #f9fafb;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 15px;
+                padding: 0 8px 0 8px;
+                background-color: #f9fafb;
+                color: #1f2937;
+            }
+        """)
+        
+        c_lay = QHBoxLayout(controls_2d)
+        c_lay.setSpacing(15)
+        c_lay.setContentsMargins(20, 25, 20, 20)
+        
+        # Tạo các checkbox với giao diện cải tiến
+        self.chk_t2 = QCheckBox("🔵 Lực căng T2")
+        self.chk_friction = QCheckBox("🟡 Lực ma sát") 
+        self.chk_lift = QCheckBox("🟠 Lực nâng")
+        
+        # Thiết lập trạng thái mặc định
+        self.chk_t2.setChecked(True)
+        self.chk_friction.setChecked(True)
+        self.chk_lift.setChecked(True)
+        
+        # Thêm tooltip giải thích
+        self.chk_t2.setToolTip("Hiển thị lực căng ban đầu T2 dọc theo băng tải")
+        self.chk_friction.setToolTip("Hiển thị lực ma sát giữa băng tải và con lăn")
+        self.chk_lift.setToolTip("Hiển thị lực nâng vật liệu theo độ cao")
+        
+        # CSS styling cho checkbox
+        checkbox_style = """
+            QCheckBox {
+                font-size: 13px;
+                font-weight: 500;
+                color: #374151;
+                spacing: 8px;
+                padding: 8px 12px;
+                border: 2px solid #d1d5db;
+                border-radius: 8px;
+                background-color: #ffffff;
+                min-width: 120px;
+                min-height: 35px;
+            }
+            QCheckBox:hover {
+                border-color: #9ca3af;
+                background-color: #f8fafc;
+            }
+            QCheckBox:checked {
+                border-color: #3b82f6;
+                background-color: #eff6ff;
+                color: #1e40af;
+            }
+            QCheckBox:checked:hover {
+                border-color: #2563eb;
+                background-color: #dbeafe;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border-radius: 4px;
+                border: 2px solid #d1d5db;
+                background-color: #ffffff;
+            }
+            QCheckBox::indicator:checked {
+                border-color: #3b82f6;
+                background-color: #3b82f6;
+                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iMTIiIHZpZXdCb3g9IjAgMCAxMiAxMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEwIDNMNC41IDguNUwyIDYiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=);
+            }
+            QCheckBox::indicator:unchecked:hover {
+                border-color: #9ca3af;
+            }
+        """
+        
+        self.chk_t2.setStyleSheet(checkbox_style)
+        self.chk_friction.setStyleSheet(checkbox_style)
+        self.chk_lift.setStyleSheet(checkbox_style)
+        
+        # Thêm các checkbox vào layout với spacing tốt hơn
+        c_lay.addWidget(self.chk_t2)
+        c_lay.addWidget(self.chk_friction)
+        c_lay.addWidget(self.chk_lift)
+        c_lay.addStretch(1)
+        
+        # Thêm nút "Hiển thị tất cả" và "Ẩn tất cả"
+        btn_show_all = QPushButton("👁️ Hiển thị tất cả")
+        btn_hide_all = QPushButton("🙈 Ẩn tất cả")
+        
+        btn_show_all.setStyleSheet("""
+            QPushButton {
+                background-color: #10b981;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-weight: 500;
+                font-size: 12px;
+                min-height: 35px;
+            }
+            QPushButton:hover {
+                background-color: #059669;
+            }
+            QPushButton:pressed {
+                background-color: #047857;
+            }
+        """)
+        
+        btn_hide_all.setStyleSheet("""
+            QPushButton {
+                background-color: #6b7280;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-weight: 500;
+                font-size: 12px;
+                min-height: 35px;
+            }
+            QPushButton:hover {
+                background-color: #4b5563;
+            }
+            QPushButton:pressed {
+                background-color: #374151;
+            }
+        """)
+        
+        # Kết nối các nút với chức năng
+        btn_show_all.clicked.connect(self._show_all_charts)
+        btn_hide_all.clicked.connect(self._hide_all_charts)
+        
+        c_lay.addWidget(btn_show_all)
+        c_lay.addWidget(btn_hide_all)
+        # --- [KẾT THÚC CẢI THIỆN GIAO DIỆN CHECKBOX] ---
+        
         self.canvas = EnhancedPlotCanvas()
         l2d.addWidget(controls_2d); l2d.addWidget(self.canvas)
 
@@ -1063,7 +1305,7 @@ class Enhanced3DResultsPanel(QWidget):
         self._optimizer_results_data = results
         self.tbl_optimizer_results.clear()
         
-        headers = ["Rank", "Điểm Fitness", "Bề rộng (mm)", "Tốc độ (m/s)", "Loại băng", "Tổng chi phí ($)", "Công suất (kW)", "HS An toàn Băng", "HS An toàn Xích"]
+        headers = ["Rank", "Điểm Fitness", "Bề rộng (mm)", "Tốc độ tính (m/s)", "Loại băng", "Sai số vận tốc (%)", "Mã nhông xích", "Tổng chi phí ($)", "Công suất (kW)", "HS An toàn Băng", "HS An toàn Xích"]
         self.tbl_optimizer_results.setColumnCount(len(headers))
         self.tbl_optimizer_results.setHorizontalHeaderLabels(headers)
         self.tbl_optimizer_results.setRowCount(len(results))
@@ -1075,12 +1317,35 @@ class Enhanced3DResultsPanel(QWidget):
             self.tbl_optimizer_results.setItem(i, 0, QTableWidgetItem(str(i + 1)))
             self.tbl_optimizer_results.setItem(i, 1, QTableWidgetItem(f"{candidate.fitness_score:.4f}"))
             self.tbl_optimizer_results.setItem(i, 2, QTableWidgetItem(str(candidate.belt_width_mm)))
-            self.tbl_optimizer_results.setItem(i, 3, QTableWidgetItem(f"{candidate.belt_speed_mps:.2f}"))
+            belt_speed = getattr(res, 'belt_speed_mps', 0.0)
+            self.tbl_optimizer_results.setItem(i, 3, QTableWidgetItem(f"{belt_speed:.2f}"))
             self.tbl_optimizer_results.setItem(i, 4, QTableWidgetItem(candidate.belt_type_name))
-            self.tbl_optimizer_results.setItem(i, 5, QTableWidgetItem(f"{getattr(res, 'cost_capital_total', 0):,.0f}"))
-            self.tbl_optimizer_results.setItem(i, 6, QTableWidgetItem(f"{getattr(res, 'required_power_kw', 0):.2f}"))
-            self.tbl_optimizer_results.setItem(i, 7, QTableWidgetItem(f"{getattr(res, 'safety_factor', 0):.2f}"))
-            self.tbl_optimizer_results.setItem(i, 8, QTableWidgetItem(f"{getattr(trans, 'safety_margin', 0):.2f}" if trans else "N/A"))
+            
+            # Thêm cột Sai số vận tốc
+            velocity_error = getattr(trans, 'velocity_error_percent', 0.0) if trans else 0.0
+            velocity_error_item = QTableWidgetItem(f"{velocity_error:.2f} %")
+            # Nếu sai số > 10% thì hiển thị màu đỏ cảnh báo
+            if velocity_error > 10.0:
+                velocity_error_item.setBackground(QColor("#fef2f2"))
+                velocity_error_item.setForeground(QColor("#dc2626"))
+                velocity_error_item.setToolTip("⚠️ CẢNH BÁO: Sai số vượt quá 10%, hãy thay đổi tỉ số truyền hộp số")
+            self.tbl_optimizer_results.setItem(i, 5, velocity_error_item)
+            
+            # Thêm cột Mã nhông xích
+            chain_designation = getattr(trans, 'chain_designation', 'N/A') if trans else 'N/A'
+            # Loại bỏ phần "(ANSI/ISO)" khỏi hiển thị
+            if chain_designation != 'N/A' and chain_designation.endswith(' (ANSI/ISO)'):
+                chain_designation = chain_designation.replace(' (ANSI/ISO)', '')
+            elif chain_designation != 'N/A' and chain_designation.endswith(' (ANSI)'):
+                chain_designation = chain_designation.replace(' (ANSI)', '')
+            elif chain_designation != 'N/A' and chain_designation.endswith(' (ISO)'):
+                chain_designation = chain_designation.replace(' (ISO)', '')
+            self.tbl_optimizer_results.setItem(i, 6, QTableWidgetItem(chain_designation))
+            
+            self.tbl_optimizer_results.setItem(i, 7, QTableWidgetItem(f"{getattr(res, 'cost_capital_total', 0):,.0f}"))
+            self.tbl_optimizer_results.setItem(i, 8, QTableWidgetItem(f"{getattr(res, 'required_power_kw', 0):.2f}"))
+            self.tbl_optimizer_results.setItem(i, 9, QTableWidgetItem(f"{getattr(res, 'safety_factor', 0):.2f}"))
+            self.tbl_optimizer_results.setItem(i, 10, QTableWidgetItem(f"{getattr(trans, 'safety_margin', 0):.2f}" if trans else "N/A"))
 
         self.tbl_optimizer_results.resizeColumnsToContents()
         self.tabs.setCurrentIndex(0) # Chuyển sang tab kết quả tối ưu
@@ -1144,6 +1409,8 @@ class Enhanced3DResultsPanel(QWidget):
         self.lbl_spacing_carry.setText(f"{recommended_spacing.get('Nhánh tải (đề xuất)', 0.0):.2f} m")
         self.lbl_spacing_return.setText(f"{recommended_spacing.get('Nhánh về (đề xuất)', 0.0):.2f} m")
         self.lbl_transition_dist.setText(f"{transition_distance:.2f} m (tối thiểu)")
+        
+
 
         # Cập nhật thông tin bộ truyền động
         trans = getattr(result, 'transmission_solution', None)
@@ -1152,9 +1419,17 @@ class Enhanced3DResultsPanel(QWidget):
             # Sử dụng đúng tên thuộc tính từ TransmissionSolution
             self.lbl_gearbox_mode.setText(getattr(trans, 'gearbox_ratio_mode', 'N/A'))
             self.lbl_gearbox_ratio_used.setText(f"{getattr(trans, 'gearbox_ratio', 0):.2f}")
-            # Lấy tốc độ động cơ từ kết quả tính toán thay vì từ transmission_solution
-            motor_rpm = getattr(result, 'motor_rpm', 1450)
-            self.lbl_motor_output_rpm.setText(f"{motor_rpm:.0f} RPM")
+            # Lấy tốc độ đầu ra động cơ từ transmission_solution
+            # Công thức: Tốc độ đầu ra = Tốc độ động cơ ÷ Tỉ số hộp số
+            motor_output_rpm = getattr(trans, 'motor_output_rpm', 0)
+            if motor_output_rpm > 0:
+                self.lbl_motor_output_rpm.setText(f"{motor_output_rpm:.0f} RPM")
+            else:
+                # Fallback: tính toán từ motor_rpm và gearbox_ratio
+                motor_rpm = getattr(result, 'motor_rpm', 1450)
+                gearbox_ratio = getattr(trans, 'gearbox_ratio', 1)
+                motor_output_rpm = motor_rpm / gearbox_ratio
+                self.lbl_motor_output_rpm.setText(f"{motor_output_rpm:.0f} RPM")
             self.lbl_gearbox_ratio.setText(f"{getattr(trans, 'gearbox_ratio', 0):.2f}")
             # --- [BẮT ĐẦU NÂNG CẤP HIỂN THỊ MÃ XÍCH] ---
             # Hiển thị mã xích với cả ANSI và ISO theo định dạng rõ ràng
@@ -1195,8 +1470,34 @@ class Enhanced3DResultsPanel(QWidget):
             # Gộp số răng nhông dẫn và bị dẫn thành một hàng
             self.lbl_sprocket_teeth.setText(f"{getattr(trans, 'drive_sprocket_teeth', 0)}/{getattr(trans, 'driven_sprocket_teeth', 0)}")
             # --- [KẾT THÚC NÂNG CẤP UI] ---
-            self.lbl_actual_velocity.setText(f"{getattr(trans, 'actual_velocity_mps', 0):.3f} m/s")
-            self.lbl_velocity_error.setText(f"{getattr(trans, 'velocity_error_percent', 0):.2f} %")
+            self.lbl_actual_velocity.setText(f"{getattr(trans, 'actual_velocity_mps', 0):.3f}")
+            
+            # Cập nhật sai số vận tốc với tooltip cảnh báo và màu sắc
+            velocity_error = getattr(trans, 'velocity_error_percent', 0)
+            self.lbl_velocity_error.setText(f"{velocity_error:.2f} %")
+            
+            # Kiểm tra nếu sai số vận tốc lớn hơn 10% thì hiển thị cảnh báo
+            if velocity_error > 10.0:
+                self.lbl_velocity_error.setStyleSheet("""
+                    QLabel {
+                        color: #dc2626;
+                        font-weight: bold;
+                        background-color: #fef2f2;
+                        border: 1px solid #fecaca;
+                        border-radius: 4px;
+                        padding: 4px;
+                    }
+                """)
+                self.lbl_velocity_error.setToolTip(
+                    "<b style='color: #dc2626;'>⚠️ CẢNH BÁO:</b><br><br>"
+                    "Không tìm thấy cặp nhông xích phù hợp, sai số vượt quá 10%, "
+                    "hãy thay đổi tỉ số truyền hộp số để giảm sai số"
+                )
+            else:
+                # Reset về style mặc định nếu sai số <= 10%
+                self.lbl_velocity_error.setStyleSheet("")
+                self.lbl_velocity_error.setToolTip("")
+            
             self.lbl_total_ratio.setText(f"{getattr(trans, 'total_transmission_ratio', 0):.2f}")
             self.lbl_required_force.setText(f"{getattr(trans, 'required_force_kN', 0):.2f} kN")
             self.lbl_allowable_force.setText(f"{getattr(trans, 'allowable_force_kN', 0):.2f} kN")
@@ -1206,8 +1507,11 @@ class Enhanced3DResultsPanel(QWidget):
         else:
             # --- [BẮT ĐẦU SỬA LỖI] ---
             # Hiển thị thông tin cơ bản ngay cả khi không có transmission_solution
+            # Công thức: Tốc độ đầu ra = Tốc độ động cơ ÷ Tỉ số hộp số
             motor_rpm = getattr(result, 'motor_rpm', 1450)
-            self.lbl_motor_output_rpm.setText(f"{motor_rpm:.0f} RPM")
+            gearbox_ratio = getattr(result, 'gearbox_ratio', 1)
+            motor_output_rpm = motor_rpm / gearbox_ratio
+            self.lbl_motor_output_rpm.setText(f"{motor_output_rpm:.0f} RPM")
             # --- [KẾT THÚC SỬA LỖI] ---
             
             # Clear labels if no transmission solution
@@ -1231,6 +1535,14 @@ class Enhanced3DResultsPanel(QWidget):
         capacity_utilization = getattr(result, "capacity_utilization", 0.0)
         
         ana_report_html = "<h3>PHÂN TÍCH KỸ THUẬT</h3>"
+        
+        # Thêm thông tin tốc độ băng
+        belt_speed = getattr(result, 'belt_speed_mps', 0.0)
+        belt_width = getattr(result, 'belt_width_mm', 0)
+        
+        ana_report_html += f"<p><b>- Tốc độ băng tải:</b> {belt_speed:.2f} m/s</p>"
+        ana_report_html += f"<p><b>- Bề rộng băng được chọn:</b> {belt_width:.0f} mm</p>"
+        
         ana_report_html += f"<p><b>- Hiệu suất truyền động:</b> {eff:.1f}% (η_m × η_g ÷ Kt)</p>"
         ana_report_html += f"<p><b>- Phần trăm sử dụng cường độ đai:</b> {belt_utilization:.1f}%</p>"
         ana_report_html += f"<p><b>- Phần trăm sử dụng tiết diện (ước tính):</b> {capacity_utilization:.1f}%</p>"
@@ -1258,3 +1570,31 @@ class Enhanced3DResultsPanel(QWidget):
         self.btn_2d_mode.setChecked(index == 0)
         self.btn_3d_mode.setChecked(index == 1)
 
+    # --- [BẮT ĐẦU THÊM CHỨC NĂNG CHECKBOX] ---
+    def _show_all_charts(self) -> None:
+        """Hiển thị tất cả các thành phần biểu đồ."""
+        self.chk_t2.setChecked(True)
+        self.chk_friction.setChecked(True)
+        self.chk_lift.setChecked(True)
+        self._redraw_charts()
+    
+    def _hide_all_charts(self) -> None:
+        """Ẩn tất cả các thành phần biểu đồ."""
+        self.chk_t2.setChecked(False)
+        self.chk_friction.setChecked(False)
+        self.chk_lift.setChecked(False)
+        self._redraw_charts()
+    
+    def _redraw_charts(self) -> None:
+        """Vẽ lại biểu đồ khi thay đổi trạng thái checkbox."""
+        if hasattr(self, '_current_params') and hasattr(self, '_current_result'):
+            plot_opts = {
+                "show_t2": self.chk_t2.isChecked(),
+                "show_friction": self.chk_friction.isChecked(),
+                "show_lift": self.chk_lift.isChecked(),
+            }
+            try:
+                self.canvas.plot_from_result(self._current_params, self._current_result, plot_opts, self._current_theme)
+            except Exception:
+                pass
+    # --- [KẾT THÚC THÊM CHỨC NĂNG CHECKBOX] ---

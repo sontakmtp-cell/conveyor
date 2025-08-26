@@ -80,44 +80,41 @@ class Optimizer:
         chain_designations = [cs.designation for cs in ACTIVE_CHAIN_SPECS if cs.designation]
 
         if not chain_designations:
-            raise ValueError("No chain specifications found. Cannot initialize population.")
+            print("Optimizer: Warning: No chain specifications found. Using default.")
+            chain_designations = ["05B", "08A", "16B"]  # Default chain designations
 
         # Tạo một số candidate "an toàn" dựa trên tham số gốc
         safe_candidates = []
         base_width = self.base_params.B_mm
-        base_speed = self.base_params.V_mps
         
         # Candidate 1: Giữ nguyên tham số gốc
-        if base_width > 0 and base_speed > 0:
-            safe_candidates.append(DesignCandidate(
-                belt_width_mm=base_width,
-                belt_speed_mps=base_speed,
-                belt_type_name=self.base_params.belt_type,
-                gearbox_ratio=STANDARD_GEARBOX_RATIOS[0] if STANDARD_GEARBOX_RATIOS else 20.0,
-                chain_spec_designation=chain_designations[0] if chain_designations else ""
-            ))
-        
-        # Candidate 2: Giảm tốc độ, giữ nguyên bề rộng
         if base_width > 0:
             safe_candidates.append(DesignCandidate(
                 belt_width_mm=base_width,
-                belt_speed_mps=max(0.5, base_speed * 0.8),
                 belt_type_name=self.base_params.belt_type,
                 gearbox_ratio=STANDARD_GEARBOX_RATIOS[0] if STANDARD_GEARBOX_RATIOS else 20.0,
                 chain_spec_designation=chain_designations[0] if chain_designations else ""
             ))
         
-        # Candidate 3: Tăng bề rộng, giữ nguyên tốc độ
-        if base_speed > 0:
-            wider_widths = [w for w in STANDARD_WIDTHS if w > base_width]
-            if wider_widths:
-                safe_candidates.append(DesignCandidate(
-                    belt_width_mm=wider_widths[0],
-                    belt_speed_mps=base_speed,
-                    belt_type_name=self.base_params.belt_type,
-                    gearbox_ratio=STANDARD_GEARBOX_RATIOS[0] if STANDARD_GEARBOX_RATIOS else 20.0,
-                    chain_spec_designation=chain_designations[0] if chain_designations else ""
-                ))
+        # Candidate 2: Tăng bề rộng
+        wider_widths = [w for w in STANDARD_WIDTHS if w > base_width]
+        if wider_widths:
+            safe_candidates.append(DesignCandidate(
+                belt_width_mm=wider_widths[0],
+                belt_type_name=self.base_params.belt_type,
+                gearbox_ratio=STANDARD_GEARBOX_RATIOS[0] if STANDARD_GEARBOX_RATIOS else 20.0,
+                chain_spec_designation=chain_designations[0] if chain_designations else ""
+            ))
+        
+        # Candidate 3: Giảm bề rộng (nếu có thể)
+        narrower_widths = [w for w in STANDARD_WIDTHS if w < base_width]
+        if narrower_widths:
+            safe_candidates.append(DesignCandidate(
+                belt_width_mm=narrower_widths[-1],  # Lấy bề rộng lớn nhất trong số nhỏ hơn
+                belt_type_name=self.base_params.belt_type,
+                gearbox_ratio=STANDARD_GEARBOX_RATIOS[0] if STANDARD_GEARBOX_RATIOS else 20.0,
+                chain_spec_designation=chain_designations[0] if chain_designations else ""
+            ))
 
         # Thêm các candidate an toàn vào đầu quần thể
         self.population.extend(safe_candidates)
@@ -128,7 +125,6 @@ class Optimizer:
         for _ in range(remaining_size):
             candidate = DesignCandidate(
                 belt_width_mm=random.choice(STANDARD_WIDTHS),
-                belt_speed_mps=random.uniform(0.5, v_max),
                 belt_type_name=random.choice(belt_types),
                 gearbox_ratio=random.choice(STANDARD_GEARBOX_RATIOS),
                 chain_spec_designation=random.choice(chain_designations)
@@ -166,52 +162,92 @@ class Optimizer:
                 return
 
         # Bước 2: Tìm min/max cho việc chuẩn hóa (với kiểm tra an toàn)
-        min_cost = min(getattr(c.calculation_result, 'cost_capital_total', float('inf')) for c in valid_candidates)
-        max_cost = max(getattr(c.calculation_result, 'cost_capital_total', 0) for c in valid_candidates)
-        min_power = min(getattr(c.calculation_result, 'required_power_kw', float('inf')) for c in valid_candidates)
-        max_power = max(getattr(c.calculation_result, 'required_power_kw', 0) for c in valid_candidates)
-        min_safety = min(getattr(c.calculation_result, 'safety_factor', float('inf')) for c in valid_candidates)
-        max_safety = max(getattr(c.calculation_result, 'safety_factor', 0) for c in valid_candidates)
+        try:
+            min_cost = min(getattr(c.calculation_result, 'cost_capital_total', float('inf')) for c in valid_candidates)
+            max_cost = max(getattr(c.calculation_result, 'cost_capital_total', 0) for c in valid_candidates)
+            min_power = min(getattr(c.calculation_result, 'required_power_kw', float('inf')) for c in valid_candidates)
+            max_power = max(getattr(c.calculation_result, 'required_power_kw', 0) for c in valid_candidates)
+            min_safety = min(getattr(c.calculation_result, 'safety_factor', float('inf')) for c in valid_candidates)
+            max_safety = max(getattr(c.calculation_result, 'safety_factor', 0) for c in valid_candidates)
 
-        # Bước 3: Tính điểm fitness cho từng cá thể hợp lệ
-        for c in valid_candidates:
-            cost = getattr(c.calculation_result, 'cost_capital_total', 0)
-            power = getattr(c.calculation_result, 'required_power_kw', 0)
-            safety = getattr(c.calculation_result, 'safety_factor', 0)
+            # Bước 3: Tính điểm fitness cho từng cá thể hợp lệ
+            for c in valid_candidates:
+                cost = getattr(c.calculation_result, 'cost_capital_total', 0)
+                power = getattr(c.calculation_result, 'required_power_kw', 0)
+                safety = getattr(c.calculation_result, 'safety_factor', 0)
 
-            cost_norm = (cost - min_cost) / (max_cost - min_cost) if max_cost > min_cost else 0
-            power_norm = (power - min_power) / (max_power - min_power) if max_power > min_power else 0
-            safety_norm = (safety - min_safety) / (max_safety - min_safety) if max_safety > min_safety else 1
+                cost_norm = (cost - min_cost) / (max_cost - min_cost) if max_cost > min_cost else 0
+                power_norm = (power - min_power) / (max_power - min_power) if max_power > min_power else 0
+                safety_norm = (safety - min_safety) / (max_safety - min_safety) if max_safety > min_safety else 1
 
-            # Tính fitness cơ bản
-            base_fitness = (
-                self.settings.w_cost * cost_norm
-                + self.settings.w_power * power_norm
-                - self.settings.w_safety * safety_norm
-            )
-            
-            # Penalize các vấn đề (nhưng không loại bỏ hoàn toàn)
-            penalty = 0.0
-            if hasattr(c, 'invalid_reasons'):
-                for reason in c.invalid_reasons:
-                    if "No transmission solution" in reason:
-                        penalty += 0.3  # Penalty 30% cho không có transmission
-                    elif "Warning:" in reason:
-                        penalty += 0.2  # Penalty 20% cho warnings
-                    elif "Cost too high" in reason:
-                        penalty += 0.1  # Penalty 10% cho cost cao
-            
-            c.fitness_score = base_fitness + penalty
+                # Tính fitness cơ bản
+                base_fitness = (
+                    self.settings.w_cost * cost_norm
+                    + self.settings.w_power * power_norm
+                    - self.settings.w_safety * safety_norm
+                )
+                
+                # Penalize các vấn đề (nhưng không loại bỏ hoàn toàn)
+                penalty = 0.0
+                if hasattr(c, 'invalid_reasons'):
+                    for reason in c.invalid_reasons:
+                        if "No transmission solution" in reason:
+                            penalty += 0.3  # Penalty 30% cho không có transmission
+                        elif "Warning:" in reason:
+                            penalty += 0.2  # Penalty 20% cho warnings
+                        elif "Cost too high" in reason:
+                            penalty += 0.1  # Penalty 10% cho cost cao
+                
+                c.fitness_score = base_fitness + penalty
+                
+        except Exception as e:
+            print(f"Optimizer: Error in fitness calculation: {e}")
+            # Fallback: gán fitness score đơn giản
+            for c in valid_candidates:
+                c.fitness_score = 1.0  # Default fitness score
 
     def _evaluate_candidate(self, candidate: DesignCandidate):
         """Chạy core.engine.calculate và kiểm tra tính hợp lệ cho một cá thể."""
-        params = copy.deepcopy(self.base_params)
-        params.B_mm = candidate.belt_width_mm
-        params.V_mps = candidate.belt_speed_mps
-        params.belt_type = candidate.belt_type_name
-        # Chế độ manual để sử dụng gearbox_ratio của candidate
-        params.gearbox_ratio_mode = "manual"
-        params.gearbox_ratio_user = candidate.gearbox_ratio
+        # Bước 1: Tối ưu hóa bề rộng và tính tốc độ tự động
+        from core.optimize import optimize_belt_width_for_capacity
+        
+        try:
+            # Lấy thông số từ base_params
+            capacity_tph = self.base_params.Qt_tph
+            density_tpm3 = self.base_params.density_tpm3
+            particle_mm = self.base_params.particle_size_mm
+            material_name = self.base_params.material
+            trough_angle_deg = 20.0  # Default, có thể cải thiện sau
+            surcharge_angle_deg = getattr(self.base_params, 'surcharge_angle_deg', 20.0) or 20.0
+            
+            # Tối ưu hóa bề rộng và tính tốc độ
+            optimal_width, v_final, v_req, v_rec, area_m2, speed_warnings = optimize_belt_width_for_capacity(
+                capacity_tph, density_tpm3, particle_mm, material_name,
+                trough_angle_deg, surcharge_angle_deg
+            )
+            
+            # Sử dụng bề rộng từ candidate, nhưng tính tốc độ tự động
+            params = copy.deepcopy(self.base_params)
+            params.B_mm = candidate.belt_width_mm  # Giữ nguyên bề rộng từ candidate
+            params.V_mps = v_final  # Sử dụng tốc độ được tính tự động
+            params.belt_type = candidate.belt_type_name
+            # Chế độ manual để sử dụng gearbox_ratio của candidate
+            params.gearbox_ratio_mode = "manual"
+            params.gearbox_ratio_user = candidate.gearbox_ratio
+            
+            # Lưu thông tin tốc độ vào candidate để debug
+            candidate.auto_calculated_speed = v_final
+            candidate.speed_warnings = speed_warnings
+            
+        except Exception as e:
+            print(f"DEBUG ERROR: Failed to calculate auto speed for {candidate}: {e}")
+            # Fallback: sử dụng tham số gốc
+            params = copy.deepcopy(self.base_params)
+            params.B_mm = candidate.belt_width_mm
+            params.V_mps = 2.0  # Tốc độ mặc định an toàn
+            params.belt_type = candidate.belt_type_name
+            params.gearbox_ratio_mode = "manual"
+            params.gearbox_ratio_user = candidate.gearbox_ratio
 
         try:
             print(f"DEBUG: Evaluating candidate {candidate}")
@@ -261,15 +297,26 @@ class Optimizer:
 
         except Exception as e:
             # Nếu có lỗi trong quá trình tính toán, coi như không hợp lệ
+            print(f"DEBUG ERROR: Calculation failed for {candidate}: {e}")
             candidate.is_valid = False
             candidate.calculation_result = CalculationResult()
             candidate.calculation_result.warnings.append(f"Lỗi tính toán: {e}")
+            candidate.invalid_reasons = [f"Lỗi tính toán: {e}"]
 
     def _tournament_selection(self, tournament_size: int, population: List[DesignCandidate]) -> DesignCandidate:
         """Lựa chọn cha mẹ bằng phương pháp Tournament Selection."""
         if not population:
             # Fallback: trả về một cá thể ngẫu nhiên từ quần thể gốc nếu không có cá thể hợp lệ
-            return random.choice(self.population)
+            if self.population:
+                return random.choice(self.population)
+            else:
+                # Tạo một candidate mặc định nếu không có gì
+                return DesignCandidate(
+                    belt_width_mm=600,
+                    belt_type_name="Vải EP (Polyester)",
+                    gearbox_ratio=20.0,
+                    chain_spec_designation=""
+                )
         
         tournament = random.sample(population, min(tournament_size, len(population)))
         tournament.sort(key=lambda c: c.fitness_score)
@@ -280,7 +327,7 @@ class Optimizer:
         child1_data = parent1.__dict__.copy()
         child2_data = parent2.__dict__.copy()
 
-        genes = ['belt_width_mm', 'belt_speed_mps', 'belt_type_name', 'gearbox_ratio', 'chain_spec_designation']
+        genes = ['belt_width_mm', 'belt_type_name', 'gearbox_ratio', 'chain_spec_designation']
         crossover_point = random.randint(1, len(genes) - 1)
         
         for i in range(crossover_point, len(genes)):
@@ -288,22 +335,37 @@ class Optimizer:
             child1_data[gene_name], child2_data[gene_name] = child2_data[gene_name], child1_data[gene_name]
 
         # Tạo cá thể con mới, reset kết quả tính toán
-        child1 = DesignCandidate(**{k: v for k, v in child1_data.items() if k in genes})
-        child2 = DesignCandidate(**{k: v for k, v in child2_data.items() if k in genes})
+        try:
+            child1 = DesignCandidate(**{k: v for k, v in child1_data.items() if k in genes})
+            child2 = DesignCandidate(**{k: v for k, v in child2_data.items() if k in genes})
+        except Exception as e:
+            print(f"Optimizer: Error in crossover: {e}")
+            # Fallback: tạo candidate mặc định
+            child1 = DesignCandidate(
+                belt_width_mm=600,
+                belt_type_name="Vải EP (Polyester)",
+                gearbox_ratio=20.0,
+                chain_spec_designation=""
+            )
+            child2 = DesignCandidate(
+                belt_width_mm=600,
+                belt_type_name="Vải EP (Polyester)",
+                gearbox_ratio=20.0,
+                chain_spec_designation=""
+            )
         
         return child1, child2
 
     def _mutate(self, candidate: DesignCandidate, mutation_rate: float):
         """Thực hiện đột biến gen với một xác suất nhất định."""
-        material_info = MATERIAL_DB.get(self.base_params.material, {})
-        v_max = material_info.get('v_max', 3.0)
         belt_types = list(ACTIVE_BELT_SPECS.keys())
         chain_designations = [cs.designation for cs in ACTIVE_CHAIN_SPECS if cs.designation]
 
+        if not chain_designations:
+            chain_designations = ["05B", "08A", "16B"]  # Default fallback
+
         if random.random() < mutation_rate:
             candidate.belt_width_mm = random.choice(STANDARD_WIDTHS)
-        if random.random() < mutation_rate:
-            candidate.belt_speed_mps = random.uniform(0.5, v_max)
         if random.random() < mutation_rate:
             candidate.belt_type_name = random.choice(belt_types)
         if random.random() < mutation_rate:

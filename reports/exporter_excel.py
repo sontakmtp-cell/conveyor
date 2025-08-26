@@ -181,63 +181,7 @@ def _write_results_sheet(writer, result, formats):
         }
     }
 
-    # --- [BẮT ĐẦU NÂNG CẤP TRUYỀN ĐỘNG] ---
-    # Thêm thông số bộ truyền động hoàn chỉnh
-    if hasattr(result, 'transmission_solution') and result.transmission_solution:
-        t = result.transmission_solution
-        
-        # --- [BẮT ĐẦU NÂNG CẤP HỘP SỐ MANUAL] ---
-        # Thông tin về chế độ hộp số
-        if hasattr(result, 'gearbox_ratio_mode'):
-            mode_text = "Manual" if result.gearbox_ratio_mode.lower() == "manual" else "Auto"
-            gearbox_info = f"{mode_text} - {t.gearbox_ratio:.1f}"
-        else:
-            gearbox_info = f"Auto - {t.gearbox_ratio:.1f}"
-        # --- [KẾT THÚC NÂNG CẤP HỘP SỐ MANUAL] ---
-        
-        # Hiển thị mã xích với cả tiêu chuẩn ANSI và ISO theo định dạng rõ ràng
-        chain_display = t.chain_designation
-        if hasattr(t, 'chain_spec') and t.chain_spec:
-            ansi_code = t.chain_spec.ansi_code or ""
-            iso_code = t.chain_spec.iso_code or ""
-            if ansi_code and iso_code:
-                # Hiển thị theo định dạng: 25/05B (ANSI/ISO)
-                chain_display = f"{ansi_code}/{iso_code} (ANSI/ISO)"
-            elif ansi_code:
-                chain_display = f"{ansi_code} (ANSI)"
-            elif iso_code:
-                chain_display = f"{iso_code} (ISO)"
-        elif '/' in chain_display and chain_display.endswith(' (ANSI/ISO)'):
-            # Xử lý format mới: "25/05B (ANSI/ISO)"
-            chain_display = chain_display  # Giữ nguyên format
-        elif '/' in chain_display:
-            # Nếu chain_designation có dạng "25/05B", hiển thị rõ ràng
-            ansi_part, iso_part = chain_display.split('/', 1)
-            chain_display = f"{ansi_part}/{iso_part} (ANSI/ISO)"
-        elif chain_display.endswith(' (ANSI)'):
-            # Xử lý format mới: "25 (ANSI)"
-            chain_display = chain_display  # Giữ nguyên format
-        elif chain_display.endswith(' (ISO)'):
-            # Xử lý format mới: "05B (ISO)"
-            chain_display = chain_display  # Giữ nguyên format
-        
-        result_groups["Bộ truyền động hoàn chỉnh"] = {
-            "Chế độ hộp số": gearbox_info,
-            "Nhông dẫn (số răng)": t.drive_sprocket_teeth,
-            "Nhông bị dẫn (số răng)": t.driven_sprocket_teeth,
-            "Mã xích (ANSI/ISO)": chain_display,
-            "Bước xích (mm)": t.chain_pitch_mm,
-            "Tổng tỉ số truyền": t.total_transmission_ratio,
-            "Vận tốc thực tế (m/s)": t.actual_belt_velocity,
-            "Sai số (%)": t.error,
-            # --- [BẮT ĐẦU NÂNG CẤP THEO KẾ HOẠCH] ---
-            "Lực kéo yêu cầu (kN)": t.required_force_kN,
-            "Lực kéo cho phép (kN)": t.allowable_kN,
-            "Hệ số an toàn": t.safety_margin,
-            "Trọng lượng xích (kg/m)": t.chain_weight_kgpm
-            # --- [KẾT THÚC NÂNG CẤP THEO KẾ HOẠCH] ---
-        }
-    # --- [KẾT THÚC NÂNG CẤP TRUYỀN ĐỘNG] ---
+
 
     if result.drive_distribution_method:
         result_groups["Truyền động kép"] = {
@@ -338,8 +282,14 @@ def _write_structural_sheet(writer, result, formats):
             chain_display = chain_display  # Giữ nguyên format
         
         # Tính toán tốc độ đầu ra động cơ
+        # Công thức: Tốc độ đầu ra = Tốc độ động cơ ÷ Tỉ số hộp số
         motor_rpm = getattr(result, 'motor_rpm', 1450)
-        output_rpm = motor_rpm / result.transmission_solution.gearbox_ratio
+        # Ưu tiên sử dụng motor_output_rpm đã được tính toán
+        if hasattr(result.transmission_solution, 'motor_output_rpm') and result.transmission_solution.motor_output_rpm > 0:
+            output_rpm = result.transmission_solution.motor_output_rpm
+        else:
+            # Fallback: tính toán từ motor_rpm và gearbox_ratio
+            output_rpm = motor_rpm / result.transmission_solution.gearbox_ratio
         
         transmission_data = {
             "Chế độ hộp số": gearbox_info,
