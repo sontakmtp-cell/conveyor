@@ -34,7 +34,7 @@ class Optimizer:
         self.settings = settings
         self.population: List[DesignCandidate] = []
 
-    def run(self, generations: int = 50, population_size: int = 100, mutation_rate: float = 0.1, tournament_size: int = 5, elitism_count: int = 10) -> List[DesignCandidate]:
+    def run(self, generations: int = 50, population_size: int = 100, mutation_rate: float = 0.1, tournament_size: int = 5, elitism_count: int = 10, crossover_rate: float = 0.8) -> List[DesignCandidate]:
         """Chạy toàn bộ quá trình tối ưu hóa GA."""
         try:
             # Kiểm tra file CSV bảng tra tốc độ trước khi chạy GA
@@ -44,17 +44,35 @@ class Optimizer:
                 print("GA sẽ chạy với giá trị fallback an toàn (2.0 m/s)")
                 print("Điều này có thể ảnh hưởng đến độ chính xác của tối ưu hóa")
             
-            # Cải thiện BƯỚC 5: Điều chỉnh elitism_count dựa trên số generations
+            # Cải thiện BƯỚC 5: Điều chỉnh elitism_count dựa trên số generations và population_size
             if elitism_count <= 0:
                 # Tính toán elitism_count dựa trên số generations và population_size
-                if generations <= 20:
-                    elitism_count = max(5, population_size // 20)  # Ít thế hệ -> ít elitism
-                elif generations <= 50:
-                    elitism_count = max(8, population_size // 15)  # Thế hệ trung bình -> elitism vừa phải
+                if population_size >= 120:
+                    # Dân số lớn: elitism cao hơn
+                    if generations <= 30:
+                        elitism_count = max(10, population_size // 12)
+                    elif generations <= 50:
+                        elitism_count = max(15, population_size // 10)
+                    else:
+                        elitism_count = max(20, population_size // 8)
+                elif population_size >= 80:
+                    # Dân số trung bình
+                    if generations <= 30:
+                        elitism_count = max(8, population_size // 15)
+                    elif generations <= 50:
+                        elitism_count = max(12, population_size // 12)
+                    else:
+                        elitism_count = max(15, population_size // 10)
                 else:
-                    elitism_count = max(10, population_size // 10)  # Nhiều thế hệ -> elitism cao
+                    # Dân số nhỏ
+                    if generations <= 30:
+                        elitism_count = max(5, population_size // 20)
+                    elif generations <= 50:
+                        elitism_count = max(8, population_size // 15)
+                    else:
+                        elitism_count = max(10, population_size // 10)
                 
-                print(f"Optimizer: Auto-adjusted elitism_count to {elitism_count} based on {generations} generations")
+                print(f"Optimizer: Auto-adjusted elitism_count to {elitism_count} based on {generations} generations and {population_size} population")
             
             self._initialize_population(population_size)
         except Exception as e:
@@ -63,6 +81,8 @@ class Optimizer:
 
         for gen in range(generations):
             print(f"Optimizer: Running Generation {gen + 1}/{generations}")
+            print(f"Optimizer: Population size: {len(self.population)}, Valid candidates: {len([c for c in self.population if c.is_valid])}")
+            
             try:
                 self._evaluate_population()
             except Exception as e:
@@ -79,6 +99,24 @@ class Optimizer:
                 print("Optimizer: No valid candidates found in population. Stopping.")
                 break
 
+            # Hiển thị thông tin về thế hệ hiện tại
+            best_fitness = valid_population[0].fitness_score if valid_population else float('inf')
+            avg_fitness = sum(c.fitness_score for c in valid_population) / len(valid_population) if valid_population else 0
+            print(f"Optimizer: Generation {gen + 1} - Best fitness: {best_fitness:.4f}, Avg fitness: {avg_fitness:.4f}")
+            
+            # CẢI THIỆN: Duy trì đa dạng dân số
+            diversity_score = self._calculate_diversity(valid_population)
+            print(f"Optimizer: Generation {gen + 1} diversity score: {diversity_score:.3f}")
+            
+            # Điều chỉnh mutation rate dựa trên diversity
+            adaptive_mutation_rate = mutation_rate
+            if diversity_score < 0.3:  # Đa dạng thấp
+                adaptive_mutation_rate = min(0.3, mutation_rate * 1.5)  # Tăng mutation
+                print(f"Optimizer: Low diversity detected, increasing mutation rate to {adaptive_mutation_rate:.3f}")
+            elif diversity_score > 0.7:  # Đa dạng cao
+                adaptive_mutation_rate = max(0.05, mutation_rate * 0.8)  # Giảm mutation
+                print(f"Optimizer: High diversity detected, decreasing mutation rate to {adaptive_mutation_rate:.3f}")
+
             # Cải thiện BƯỚC 5: Điều chỉnh elitism_count động dựa trên chất lượng dân số
             current_elitism_count = min(elitism_count, len(valid_population))
             if len(valid_population) < elitism_count:
@@ -86,13 +124,28 @@ class Optimizer:
             
             new_generation = valid_population[:current_elitism_count] # Giữ lại cá thể tinh hoa
 
+            # CẢI THIỆN: Sử dụng crossover_rate để quyết định có tạo con hay không
             while len(new_generation) < population_size:
                 parent1 = self._tournament_selection(tournament_size, valid_population)
                 parent2 = self._tournament_selection(tournament_size, valid_population)
-                child1, child2 = self._crossover(parent1, parent2)
-                self._mutate(child1, mutation_rate)
-                self._mutate(child2, mutation_rate)
-                new_generation.extend([child1, child2])
+                
+                # Sử dụng crossover_rate để quyết định có tạo con hay không
+                if random.random() < crossover_rate:
+                    child1, child2 = self._crossover(parent1, parent2)
+                    self._mutate(child1, adaptive_mutation_rate)
+                    self._mutate(child2, adaptive_mutation_rate)
+                    new_generation.extend([child1, child2])
+                else:
+                    # Nếu không crossover, chỉ mutate và copy parent
+                    child1 = copy.deepcopy(parent1)
+                    child2 = copy.deepcopy(parent2)
+                    self._mutate(child1, adaptive_mutation_rate * 1.5)  # Tăng mutation cho copy
+                    self._mutate(child2, adaptive_mutation_rate * 1.5)
+                    new_generation.extend([child1, child2])
+                
+                # Kiểm tra nếu đã đủ dân số
+                if len(new_generation) >= population_size:
+                    break
             
             # Cắt tỉa dân số về đúng kích thước mong muốn
             self.population = new_generation[:population_size]
@@ -104,7 +157,31 @@ class Optimizer:
         
         valid_results = [c for c in self.population if c.is_valid]
         print(f"Optimizer: Found {len(valid_results)} valid solutions.")
-        return valid_results[:10] # Trả về top 10
+        
+        # Hiển thị thống kê cuối cùng
+        if valid_results:
+            best_candidate = valid_results[0]
+            print(f"Optimizer: Best solution - Width: {best_candidate.belt_width_mm}mm, "
+                  f"Fitness: {best_candidate.fitness_score:.4f}, "
+                  f"Belt Type: {best_candidate.belt_type_name}, "
+                  f"Gearbox: {best_candidate.gearbox_ratio:.2f}")
+            
+            # Hiển thị top 5 solutions
+            print("Optimizer: Top 5 solutions:")
+            for i, candidate in enumerate(valid_results[:5]):
+                print(f"  {i+1}. Width: {candidate.belt_width_mm}mm, "
+                      f"Fitness: {candidate.fitness_score:.4f}, "
+                      f"Belt: {candidate.belt_type_name}, "
+                      f"Gearbox: {candidate.gearbox_ratio:.2f}")
+        
+        # CẢI THIỆN: Trả về kết quả đa dạng hơn
+        if len(valid_results) >= 15:
+            # Trả về top 15 thay vì chỉ top 10
+            return valid_results[:15]
+        elif len(valid_results) >= 10:
+            return valid_results[:10]
+        else:
+            return valid_results  # Trả về tất cả nếu ít hơn 10
 
     def _initialize_population(self, size: int):
         """Tạo quần thể ban đầu một cách ngẫu nhiên."""
@@ -188,31 +265,111 @@ class Optimizer:
                 chain_spec_designation=chain_designations[0] if chain_designations else ""
             ))
 
+        # MỞ RỘNG: Thêm các candidate với chain designation khác nhau
+        if len(chain_designations) > 1:
+            for i in range(min(3, len(chain_designations))):  # Tối đa 3 chain khác nhau
+                if i < len(chain_designations):
+                    safe_candidates.append(DesignCandidate(
+                        belt_width_mm=base_width,
+                        belt_type_name=self.base_params.belt_type,
+                        gearbox_ratio=STANDARD_GEARBOX_RATIOS[0] if STANDARD_GEARBOX_RATIOS else 20.0,
+                        chain_spec_designation=chain_designations[i]
+                    ))
+
+        # MỞ RỘNG: Thêm candidate với gearbox ratio trung bình
+        if len(STANDARD_GEARBOX_RATIOS) > 2:
+            mid_index = len(STANDARD_GEARBOX_RATIOS) // 2
+            mid_gearbox = STANDARD_GEARBOX_RATIOS[mid_index]
+            safe_candidates.append(DesignCandidate(
+                belt_width_mm=base_width,
+                belt_type_name=self.base_params.belt_type,
+                gearbox_ratio=mid_gearbox,
+                chain_spec_designation=chain_designations[0] if chain_designations else ""
+            ))
+
         # Thêm các candidate an toàn vào đầu quần thể
         self.population.extend(safe_candidates)
         print(f"Optimizer: Added {len(safe_candidates)} optimized safe candidates based on original parameters")
-        print(f"Optimizer: Safe candidates include: base_width={base_width}mm, alternative widths, gearbox ratios, and belt types")
+        print(f"Optimizer: Safe candidates include: base_width={base_width}mm, alternative widths, gearbox ratios, belt types, and chain designations")
 
         # Tạo các candidate ngẫu nhiên cho phần còn lại với cải tiến
         remaining_size = size - len(safe_candidates)
-        for _ in range(remaining_size):
-            # Cải tiến: Tăng khả năng chọn bề rộng gần với base_width
-            if random.random() < 0.3:  # 30% khả năng chọn bề rộng gần
-                # Chọn từ 3 bề rộng gần nhất
-                nearby_widths = sorted(STANDARD_WIDTHS, key=lambda x: abs(x - base_width))[:3]
+        
+        # CẢI THIỆN: Tạo candidate với chiến lược thông minh hơn
+        for i in range(remaining_size):
+            # Chiến lược 1: 40% khả năng chọn bề rộng gần với base_width
+            if random.random() < 0.4:
+                # Chọn từ 5 bề rộng gần nhất (tăng từ 3 lên 5)
+                nearby_widths = sorted(STANDARD_WIDTHS, key=lambda x: abs(x - base_width))[:5]
                 belt_width_mm = random.choice(nearby_widths)
+            # Chiến lược 2: 30% khả năng chọn bề rộng trung bình
+            elif random.random() < 0.7:
+                # Chọn từ bề rộng trung bình
+                mid_widths = sorted(STANDARD_WIDTHS)[len(STANDARD_WIDTHS)//4:3*len(STANDARD_WIDTHS)//4]
+                belt_width_mm = random.choice(mid_widths)
+            # Chiến lược 3: 30% khả năng chọn bề rộng bất kỳ
             else:
                 belt_width_mm = random.choice(STANDARD_WIDTHS)
             
+            # Chiến lược belt type: ưu tiên loại gốc
+            if random.random() < 0.6:
+                belt_type_name = self.base_params.belt_type
+            else:
+                belt_type_name = random.choice(belt_types)
+            
+            # Chiến lược gearbox: ưu tiên tỉ số gần với gốc
+            if random.random() < 0.5:
+                # Chọn từ 3 tỉ số gần nhất với tỉ số đầu tiên
+                base_ratio = STANDARD_GEARBOX_RATIOS[0]
+                nearby_ratios = sorted(STANDARD_GEARBOX_RATIOS, key=lambda x: abs(x - base_ratio))[:3]
+                gearbox_ratio = random.choice(nearby_ratios)
+            else:
+                gearbox_ratio = random.choice(STANDARD_GEARBOX_RATIOS)
+            
+            # Chiến lược chain: ưu tiên loại gốc
+            if random.random() < 0.6:
+                chain_spec_designation = chain_designations[0]
+            else:
+                chain_spec_designation = random.choice(chain_designations)
+            
             candidate = DesignCandidate(
                 belt_width_mm=belt_width_mm,
-                belt_type_name=random.choice(belt_types),
-                gearbox_ratio=random.choice(STANDARD_GEARBOX_RATIOS),
-                chain_spec_designation=random.choice(chain_designations)
+                belt_type_name=belt_type_name,
+                gearbox_ratio=gearbox_ratio,
+                chain_spec_designation=chain_spec_designation
             )
             self.population.append(candidate)
         
         print(f"Optimizer: Initialized population with {len(self.population)} candidates ({len(safe_candidates)} optimized safe + {remaining_size} random with bias)")
+
+    def _calculate_diversity(self, population: List[DesignCandidate]) -> float:
+        """Tính toán độ đa dạng của dân số dựa trên các tham số."""
+        if len(population) <= 1:
+            return 0.0
+        
+        # Tính đa dạng dựa trên các tham số chính
+        widths = [c.belt_width_mm for c in population]
+        belt_types = [c.belt_type_name for c in population]
+        gearbox_ratios = [c.gearbox_ratio for c in population]
+        chain_designations = [c.chain_spec_designation for c in population]
+        
+        # Đa dạng bề rộng (normalized)
+        width_diversity = len(set(widths)) / len(STANDARD_WIDTHS)
+        
+        # Đa dạng loại băng
+        belt_diversity = len(set(belt_types)) / len(ACTIVE_BELT_SPECS)
+        
+        # Đa dạng tỉ số truyền
+        gearbox_diversity = len(set(gearbox_ratios)) / len(STANDARD_GEARBOX_RATIOS)
+        
+        # Đa dạng chain
+        chain_diversity = len(set(chain_designations)) / len([cs.designation for cs in ACTIVE_CHAIN_SPECS if cs.designation])
+        
+        # Tính trung bình có trọng số
+        total_diversity = (width_diversity * 0.4 + belt_diversity * 0.2 + 
+                          gearbox_diversity * 0.3 + chain_diversity * 0.1)
+        
+        return total_diversity
 
     def _evaluate_population(self):
         """Đánh giá từng cá thể trong quần thể, chuẩn hóa và tính điểm fitness."""
@@ -263,6 +420,20 @@ class Optimizer:
             max_power = max(getattr(c.calculation_result, 'required_power_kw', 0) for c in valid_candidates)
             min_safety = min(getattr(c.calculation_result, 'safety_factor', float('inf')) for c in valid_candidates)
             max_safety = max(getattr(c.calculation_result, 'safety_factor', 0) for c in valid_candidates)
+            
+            # Cải tiến mới: Chuẩn hóa sai số vận tốc
+            velocity_errors = []
+            for c in valid_candidates:
+                if hasattr(c.calculation_result, 'transmission_solution') and c.calculation_result.transmission_solution:
+                    vel_err = getattr(c.calculation_result.transmission_solution, "velocity_error_percent", 0.0)
+                    velocity_errors.append(vel_err)
+            
+            if velocity_errors:
+                min_velocity_error = min(velocity_errors)
+                max_velocity_error = max(velocity_errors)
+                print(f"DEBUG: Velocity error range: [{min_velocity_error:.2f}%, {max_velocity_error:.2f}%]")
+            else:
+                min_velocity_error = max_velocity_error = 0.0
 
             # Cải thiện: Kiểm tra và xử lý các trường hợp đặc biệt
             logger.debug(f"Fitness calculation - Cost range: [{min_cost:.2f}, {max_cost:.2f}], "
@@ -313,18 +484,32 @@ class Optimizer:
                             safety_norm = (target_safety - safety) / target_safety  # Penalty tăng dần
                     else:
                         safety_norm = 0.5  # Giá trị trung bình nếu không có target
+                
+                # Cải tiến mới: Chuẩn hóa sai số vận tốc
+                velocity_error_norm = 0.0
+                if hasattr(c.calculation_result, 'transmission_solution') and c.calculation_result.transmission_solution:
+                    vel_err = getattr(c.calculation_result.transmission_solution, "velocity_error_percent", 0.0)
+                    if max_velocity_error > min_velocity_error:
+                        velocity_error_norm = (vel_err - min_velocity_error) / (max_velocity_error - min_velocity_error)
+                    else:
+                        velocity_error_norm = 0.0  # Không có sự khác biệt
+                else:
+                    velocity_error_norm = 1.0  # Penalty cao nếu không có transmission solution
 
-                # Tính fitness cơ bản với cải thiện
+                # Tính fitness cơ bản với cải thiện (tích hợp sai số vận tốc)
                 base_fitness = (
                     self.settings.w_cost * cost_norm
                     + self.settings.w_power * power_norm
                     - self.settings.w_safety * safety_norm
+                    + self.settings.w_velocity_error * velocity_error_norm
                 )
                 
-                # Log chi tiết để debug
+                # Log chi tiết để debug (bao gồm sai số vận tốc)
+                vel_err = getattr(c.calculation_result.transmission_solution, "velocity_error_percent", 0.0) if hasattr(c.calculation_result, 'transmission_solution') and c.calculation_result.transmission_solution else 0.0
                 print(f"DEBUG: Candidate {c.belt_width_mm}mm - Cost: {cost:.2f} (norm: {cost_norm:.3f}), "
                       f"Power: {power:.2f} (norm: {power_norm:.3f}), "
                       f"Safety: {safety:.2f} (norm: {safety_norm:.3f}), "
+                      f"Velocity Error: {vel_err:.2f}% (norm: {velocity_error_norm:.3f}), "
                       f"Base fitness: {base_fitness:.3f}")
                 
                 # Penalize các vấn đề (nhưng không loại bỏ hoàn toàn)
@@ -345,6 +530,8 @@ class Optimizer:
                             penalty += 0.4  # Thêm penalty cho vấn đề tiết diện
                         elif "tốc độ" in reason.lower() and ("vượt quá" in reason or "cao" in reason):
                             penalty += 0.35  # Thêm penalty cho vấn đề tốc độ
+                        elif "High velocity error" in reason:
+                            penalty += 0.25  # Thêm penalty cho sai số vận tốc cao
                 
                 # Thêm penalty dựa trên safety factor nếu quá thấp
                 if safety < self.settings.min_belt_safety_factor:
@@ -378,7 +565,8 @@ class Optimizer:
                 sorted_candidates = sorted(valid_candidates, key=lambda x: x.fitness_score)
                 print(f"DEBUG: Top 3 candidates by fitness:")
                 for i, candidate in enumerate(sorted_candidates[:3]):
-                    print(f"  {i+1}. Width: {candidate.belt_width_mm}mm, Fitness: {candidate.fitness_score:.3f}")
+                    vel_err = getattr(candidate.calculation_result.transmission_solution, "velocity_error_percent", 0.0) if hasattr(candidate.calculation_result, 'transmission_solution') and candidate.calculation_result.transmission_solution else 0.0
+                    print(f"  {i+1}. Width: {candidate.belt_width_mm}mm, Fitness: {candidate.fitness_score:.3f}, Velocity Error: {vel_err:.2f}%")
                 
         except Exception as e:
             print(f"Optimizer: Error in fitness calculation: {e}")
@@ -487,6 +675,20 @@ class Optimizer:
                     print(f"DEBUG INVALID: {candidate} - Cost {cost_val} > {self.settings.max_budget_usd * 1.5}")
                     is_valid = False
                     invalid_reasons.append(f"Cost too high: {cost_val}")
+            
+            # Kiểm tra sai số vận tốc - Cải tiến mới
+            if hasattr(result, 'transmission_solution') and result.transmission_solution:
+                vel_err = getattr(result.transmission_solution, "velocity_error_percent", 0.0)
+                if vel_err > self.settings.max_velocity_error_percent:
+                    print(f"DEBUG INVALID: {candidate} - Velocity error {vel_err:.2f}% > {self.settings.max_velocity_error_percent}% (above threshold)")
+                    is_valid = False
+                    invalid_reasons.append(f"Velocity error too high: {vel_err:.2f}% > {self.settings.max_velocity_error_percent}%")
+                elif vel_err > 5.0:  # Cảnh báo nếu > 5% (ngưỡng cảnh báo cố định)
+                    print(f"DEBUG WARNING: {candidate} - Velocity error {vel_err:.2f}% above warning threshold 5%")
+                    invalid_reasons.append(f"Warning: High velocity error: {vel_err:.2f}%")
+                
+                # Log sai số vận tốc để theo dõi
+                print(f"DEBUG: {candidate} - Velocity error: {vel_err:.2f}%")
             
             # Kiểm tra các cảnh báo quan trọng - Chỉ cảnh báo
             if hasattr(result, 'warnings') and result.warnings:

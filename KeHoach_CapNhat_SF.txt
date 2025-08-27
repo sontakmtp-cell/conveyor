@@ -1,0 +1,261 @@
+KẾ HOẠCH CẬP NHẬT LOGIC HỆ SỐ AN TOÀN (SF) CHO ỨNG DỤNG TÍNH TOÁN BĂNG TẢI (Phiên bản cập nhật)
+
+Mục tiêu
+
+Đồng bộ hóa công thức tính SF theo tài liệu “TÍNH TOÁN BĂNG TẢI.pdf”:
+• Đai sợi thép (ST): SF = (ST_rating × B_cm) / Fmax  [công thức (28)]
+• Đai vải nhiều lớp (EP/NN/PVC/Rubber): SFz = (TS_rating × Be_cm) / Fmax  [công thức (29), Be = B - 6 cm]
+
+Chuẩn hóa tra “SF thiết kế” theo bảng 19, 20 (phụ thuộc nhóm vật liệu A/B, cỡ hạt <30/≥30 mm, chu kỳ khởi động).
+
+Tự động cảnh báo nếu SF_thực dưới ngưỡng cho phép và nếu SF_thực lệch quá xa so với SF_thiết_kế.
+
+Giữ tương thích với mô hình dữ liệu hiện tại và luồng tính lực căng/power.
+
+Phạm vi ảnh hưởng chính (file)
+
+ui/ui_components_3d_enhanced.py: Cập nhật giao diện người dùng.
+
+core/models.py: Cập nhật mô hình dữ liệu nếu cần.
+
+core/safety_factors.py: Chứa bảng tra và logic tra cứu.
+
+core/engine.py: Cập nhật logic tính toán chính.
+
+Kết quả mong đợi
+
+UI được đơn giản hóa, chỉ cho phép chọn băng tải Sợi vải hoặc Sợi thép.
+
+Nhóm vật liệu được xác định tự động, giảm thiểu lỗi nhập liệu.
+
+SF_thiết_kế được tra đúng bảng khi có đủ tham số.
+
+SF_thực được tính nhất quán đơn vị (N, kgf; cm, m) và phản ánh đúng loại đai.
+
+Hệ thống sinh cảnh báo vàng/đỏ theo ngưỡng riêng cho ST và Fabric.
+
+KẾ HOẠCH TRIỂN KHAI CHI TIẾT
+BƯỚC 1 — Cập nhật Giao diện (UI) và Mô hình dữ liệu
+1.1. Cập nhật Giao diện người dùng (UI):
+- Tại file ui/ui_components_3d_enhanced.py, thay đổi phần chọn loại băng tải thành ComboBox (hộp chọn) chỉ với 2 lựa chọn: "Băng tải sợi vải (Fabric)" và "Băng tải sợi thép (Steel Cord)".
+- Loại bỏ các lựa chọn băng tải khác để đơn giản hóa luồng tính toán.
+- Backend sẽ nhận giá trị belt_type là 'fabric' hoặc 'steel_cord' tương ứng khi người dùng lựa chọn.
+
+1.2. Tự động xác định Nhóm vật liệu (Material Group):
+- Logic trong UI sẽ tự động gán material_group dựa trên các CheckBox vật liệu được chọn:
+• Nếu người dùng tick chọn "Granular materials" HOẶC "Coal and abrasive materials" → material_group được gán là "A".
+• Nếu người dùng tick chọn "Hard ores, rocks and materials with sharp edges" → material_group được gán là "B".
+- Quy tắc ưu tiên: Nếu người dùng chọn cả vật liệu thuộc nhóm A và nhóm B, hệ thống sẽ ưu tiên gán material_group là "B" vì đây là điều kiện vận hành khắc nghiệt hơn.
+
+1.3. Đảm bảo UI truyền vào đầy đủ tham số cho engine:
+- belt_type: 'fabric' | 'steel_cord' (từ ComboBox).
+- material_group: "A" | "B" (được xác định tự động từ các CheckBox).
+- lump_size_ge_30mm: bool
+- duty_cycle_minutes: float
+
+1.4 Đồng bộ tên loại băng với kế hoạch UI mới
+1.Trong `core/specs.py`, giới hạn `ACTIVE_BELT_SPECS` chỉ còn hai khóa: `"fabric"` và `"steel_cord"`, kèm thông số `T_allow_Npm` tương ứng.
+2. Trong `core/optimizer/optimizer.py`, cập nhật đoạn khởi tạo dân số (`_initialize_population`) để sử dụng các khóa mới và hiển thị nhãn thân thiện nếu cần.
+3. Đảm bảo `ConveyorParameters.belt_type` và mọi nơi khác đều dùng hai chuỗi `"fabric"` hoặc `"steel_cord"`.
+
+1.5 Hỗ trợ mã rating mới (ST-1600, EP160/4) cho quá trình tối ưu
+1. Thêm trường `belt_rating` (chuỗi) vào `core/optimizer/models.py::DesignCandidate`.
+2. Trong `_initialize_population`, tạo `belt_rating` dựa trên rating đầu vào hoặc danh sách chuẩn (ví dụ: chọn từ “ST-1000”, “ST-1600”…).
+3. Khi xây dựng `params` trước khi gọi `calculate()`, gán `params.belt_type = candidate.belt_rating` để engine parse đúng rating.
+4. Cập nhật `optimizer._mutate` và `_crossover` để xử lý gene `belt_rating`.
+
+1.6 Tận dụng SF_design và tỷ lệ SF_actual/SF_design trong fitness
+1. Trong `core/optimizer/optimizer.py::_evaluate_candidate`, sau khi lấy `result`, tính `sf_ratio = result.safety_factor / result.sf_design` nếu `result.sf_design > 0`.
+2. Nếu `sf_ratio < 0.8`, thêm vào `invalid_reasons` hoặc tăng penalty trong `fitness_score`.
+3. Nếu `sf_ratio > 1.5`, cân nhắc giảm nhẹ điểm (thiết kế quá dư).
+4. Điều chỉnh `fitness_score` để bao gồm penalty/bonus dựa trên `sf_ratio`.
+
+
+---------------------------------------------
+BƯỚC 2A — TÍCH HỢP BẢNG TRA TIÊU CHUẨN (BẢNG 17 & 18) VÀO safety_factors.py
+---------------------------------------------
+Mục tiêu
+- Cung cấp danh mục chuẩn để UI lựa chọn và engine quy đổi chính xác sang sức chịu kéo theo mét chiều rộng (T_allow_Npm).
+- Đồng bộ cách nhập mã rating: "ST-xxxx" cho sợi thép và "EPa/b" hoặc "NFa/b" cho sợi vải.
+
+2A.1 CẤU TRÚC DỮ LIỆU CHUẨN (dán trực tiếp vào core/safety_factors.py hoặc core/specs.py)
+```python
+# Bảng 17 — Steel cord (đơn vị kgf/cm theo bề rộng)
+STEEL_CORD_STANDARD = [
+    400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000
+]
+# Ý nghĩa: ST-{value}, ví dụ ST-1600 nghĩa là 1600 kgf/cm.
+
+# Bảng 18 — Fabric (EP/NF): rating mỗi lớp (N/mm) và các tổ hợp số lớp hợp lệ
+FABRIC_STANDARD = {
+    "EP": {  # Polyester (EP) – rating per ply (N/mm): allowed plies
+        160: [2],
+        200: [2],
+        250: [2],
+        315: [2, 3],
+        400: [2, 3, 4],
+        500: [2, 3, 4],
+        630: [3, 4],
+        800: [3, 4, 5],
+        1000: [4, 5],
+        1250: [4, 5],
+        1600: [5],
+    },
+    "NF": {  # Nylon (NN/NF) – rating per ply (N/mm): allowed plies
+        160: [2],
+        200: [2],
+        250: [2],
+        315: [2, 3],
+        400: [2, 3, 4],
+        500: [2, 3, 4],
+        630: [3, 4],
+        800: [3, 4, 5],
+        1000: [4, 5],
+        1250: [4, 5],
+        1600: [4, 5],
+        2000: [4, 5],
+        2500: [5, 6],
+        3150: [6],
+    },
+}
+
+def list_fabric_codes(core: str) -> list[str]:
+    \"\"\"Trợ giúp UI liệt kê nhanh các mã dạng 'EP160/2', 'NF500/4'.\"\"\"
+    core = core.upper()
+    if core not in FABRIC_STANDARD:
+        return []
+    out = []
+    for rating, plies in FABRIC_STANDARD[core].items():
+        for p in plies:
+            out.append(f\"{core}{rating}/{p}\")
+    return out
+```
+
+2A.2 HÀM PARSE MÃ RATING VÀ QUY ĐỔI VỀ T_allow_Npm
+```python
+KGF_TO_N = 9.80665
+
+def parse_steel_code_to_T_allow_Npm(code: str) -> float:
+    \"\"\"'ST-1600' → 1600 kgf/cm → N/m = 1600 * 9.80665 * 100.\"\"\"
+    code = code.strip().upper()
+    if not code.startswith(\"ST-\"):
+        raise ValueError(\"Mã không phải ST-xxxx\")
+    st_no = float(code.split(\"-\")[1])
+    return st_no * KGF_TO_N * 100.0  # N/m
+
+def parse_fabric_code_to_T_allow_Npm(code: str) -> float:
+    \"\"\"'EP160/4' hoặc 'NF630/3' → (160*4) N/mm → N/m = (N/mm)*1000.\"\"\"
+    code = code.strip().upper()
+    # ví dụ head='EP160', plies='4'
+    head, plies = code.split(\"/\")
+    per_ply = float(''.join(c for c in head if c.isdigit()))  # 160 từ EP160
+    n = int(plies)
+    total_n_per_mm = per_ply * n
+    return total_n_per_mm * 1000.0  # N/m
+```
+
+2A.3 WIREFRAME CHO UI (GỢI Ý)
+- Chọn lõi: Dropdown { 'Fabric (EP/NF)', 'Steel cord (ST)' } → map belt_type = 'fabric' | 'steel'.
+- Nếu 'fabric':
+  • Radio: EP | NF
+  • Dropdown rating per ply: lấy keys từ FABRIC_STANDARD[EP|NF]
+  • Dropdown số lớp: lấy list từ FABRIC_STANDARD[core][rating]
+  • Tự hiển thị preview mã: EP{rating}/{plies}
+- Nếu 'steel':
+  • Dropdown: ST-{value} từ STEEL_CORD_STANDARD
+
+2A.4 QUY ĐỔI ĐƠN VỊ CHUẨN CHO ENGINE
+- Steel cord:  T_allow_Npm = ST_No[kgf/cm] × 9.80665 × 100
+- Fabric:      T_allow_Npm = (rating_per_ply × plies)[N/mm] × 1000
+- Bề rộng hữu ích (fabric): Be_cm = B_cm − 6 (không nhỏ hơn 1e-6)
+
+2A.5 TÍCH HỢP VÀ GỌI TRONG engine.finalize_results()
+- Nếu `params.belt_type == 'steel'` và người dùng chọn `ST-xxxx`:
+  T_allow = parse_steel_code_to_T_allow_Npm(code)
+- Nếu `params.belt_type == 'fabric'` và người dùng chọn `EPa/b` hoặc `NFa/b`:
+  T_allow = parse_fabric_code_to_T_allow_Npm(code)
+- Tính SF_thực như BƯỚC 3.4 và ghi vào `result.safety_factor`.
+
+2A.6 TEST BOILERPLATE BỔ SUNG
+- parse_steel_code_to_T_allow_Npm(\"ST-1000\") ≈ 980_665 N/m
+- parse_fabric_code_to_T_allow_Npm(\"EP160/4\") = 640_000 N/m
+- list_fabric_codes(\"EP\") trả về mã hợp lệ, không trùng lặp; tương tự cho \"NF\".
+- UI: khi chuyển EP→NF, danh sách rating và số lớp cập nhật đúng.
+```
+---------------------------------------------
+BỔ SUNG CHECKLIST LIÊN QUAN BẢNG 17 & 18
+---------------------------------------------
+[ ] Thêm STEEL_CORD_STANDARD, FABRIC_STANDARD và list_fabric_codes vào safety_factors.py (hoặc specs.py).
+[ ] Thêm parse_steel_code_to_T_allow_Npm và parse_fabric_code_to_T_allow_Npm.
+[ ] Cập nhật UI để sinh đúng mã rating theo lựa chọn người dùng.
+[ ] Viết unit tests cho 2A.6.
+
+BƯỚC 3 — Chuẩn hóa lookup “SF thiết kế”
+2.1. Trong core/safety_factors.py:
+- Kiểm tra lại các bảng SF_ST và SF_Fabric đã trùng khớp với bảng 19, 20 của PDF.
+- Đảm bảo logic phân loại chu kỳ khởi động (duty_cycle_minutes) là chính xác.
+2.2. Hàm lookup_sf_design(belt_type, group, lump_ge_30mm, duty_minutes):
+- Chuẩn hóa tham số đầu vào (ví dụ: group viết hoa).
+- Trả về SF_thiết_kế (float) hoặc báo lỗi nếu không tìm thấy.
+2.3. Hàm get_sf_warning_thresholds(belt_type):
+- ST: cảnh báo đỏ khi SF_thực < 6.0; vàng nếu SF_thực < 7.5.
+- Fabric: đỏ khi SF_thực < 8.0; vàng nếu SF_thực < 10.0.
+
+BƯỚC 4 — Chuẩn hóa công thức tính SF_thực
+3.1. Thống nhất đơn vị nội bộ:
+- Fmax: Luôn tính bằng Newton (N).
+- Rating băng tải: Quy đổi về N/m.
+3.2. Tính T_allow_Npm (sức chịu kéo cho phép trên mét chiều rộng):
+- Steel cord: Từ ST-No (kgf/cm) → N/m. Ví dụ: ST-1000 → 980,665 N/m.
+- Fabric: Từ EP160/4 → 160 N/mm/lớp * 4 lớp = 640 N/mm → 640,000 N/m.
+3.3. Xác định bề rộng hữu ích:
+- Be_m = (B_cm - 6) / 100 cho băng tải sợi vải.
+- B_m = B_cm / 100 cho băng tải sợi thép.
+3.4. Công thức tính SF_thực:
+- Steel cord: SF_thực = (B_m * T_allow_Npm) / Fmax_N
+- Fabric: SF_thực = (Be_m * T_allow_Npm) / Fmax_N
+
+BƯỚC 5 — Tích hợp vào core/engine.py
+4.1. Sau khi đã tính được max_tension (Fmax_N):
+- Tính T_allow_Npm dựa trên belt_rating và belt_type.
+- Tính SF_thực theo công thức ở BƯỚC 3.4 và gán vào result.safety_factor.
+4.2. Tra cứu SF_thiết_kế:
+- sf_design = lookup_sf_design(...)
+- Gán vào result.sf_design.
+4.3. So sánh và tạo cảnh báo:
+- Lấy ngưỡng cảnh báo từ get_sf_warning_thresholds(...).
+- So sánh SF_thực với ngưỡng để thêm cảnh báo Vàng/Đỏ.
+- Tính tỉ lệ ratio = SF_thực / SF_thiết_kế và thêm cảnh báo nếu tỉ lệ quá thấp (<0.8) hoặc thông báo nếu quá an toàn (>1.5).
+
+BƯỚC 6 — Chuẩn hóa nguồn dữ liệu rating đai
+5.1. Steel cord:
+- Cho phép người dùng nhập mã dạng "ST-1600" và chương trình sẽ tự parse số 1600.
+5.2. Fabric:
+- Cho phép nhập mã dạng "EP160/4" và chương trình sẽ tự parse để tính ra rating tổng.
+5.3. Nếu không xác định được rating → hiển thị cảnh báo yêu cầu người dùng cung cấp thông tin.
+
+BƯỚC 7 — Kiểm thử (Unit & Integration)
+6.1. Unit tests cho safety_factors.lookup_sf_design với mọi trường hợp.
+6.2. Unit tests cho việc đổi đơn vị và tính Be_cm.
+6.3. Test tính SF_thực với các bộ giá trị mẫu cho cả hai loại băng tải.
+6.4. Test các ngưỡng cảnh báo và tỉ lệ SF_thực/SF_thiết_kế.
+
+BƯỚC 8 — Nhật ký, UI và Báo cáo
+7.1. Ghi log các giá trị trung gian để dễ dàng debug.
+7.2. UI hiển thị trạng thái an toàn rõ ràng (OK/Cảnh báo/Nguy hiểm).
+7.3. Báo cáo PDF/Excel phải bao gồm bảng tóm tắt về hệ số an toàn.
+
+BƯỚC 9 — Tương thích ngược và Cấu hình
+8.1. Nếu thiếu thông tin, sử dụng giá trị mặc định hợp lý.
+8.2. Cho phép cấu hình các ngưỡng cảnh báo trong file config thay vì hard-code.
+
+CHECKLIST THỰC THI
+[ ] 1. Cập nhật UI: Giới hạn ComboBox và thêm logic cho CheckBox vật liệu.
+[ ] 2. Rà soát safety_factors.py: Xác nhận bảng tra.
+[ ] 3. Viết/kiểm tra hàm parse mã băng tải để suy ra T_allow_Npm.
+[ ] 4. Cập nhật engine.py: Tính SF_thực và gán vào kết quả.
+[ ] 5. Tích hợp lookup_sf_design và get_sf_warning_thresholds để sinh cảnh báo.
+[ ] 6. Bổ sung unit tests cho các logic mới.
+[ ] 7. Cập nhật UI hiển thị và báo cáo xuất ra.
+[ ] 8. Code review và thử nghiệm với các kịch bản thực tế.
+[ ] 9. Viết CHANGELOG, cập nhật phiên bản và merge.
