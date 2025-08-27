@@ -9,6 +9,7 @@ from .models import BeltType, CalculationResult, ConveyorParameters
 from .specs import G, ACTIVE_MATERIAL_DB, ACTIVE_BELT_SPECS
 from .utils.unit_conversion import deg2rad
 from .utils.trough_utils import parse_trough_label, capacity_from_geometry_tph
+from .safety_factors import lookup_sf_design, get_sf_warning_thresholds
 
 # --- Dữ liệu số hóa từ Mục 8, "TÍNH TOÁN BĂNG TẢI.pdf" ---
 
@@ -106,6 +107,55 @@ def get_idler_base_weights(width_mm: int) -> Tuple[float, float]:
     print(f"DEBUG IDLER_WEIGHTS: width_mm={width_mm}, closest_w={closest_w}, weights={weights}")
     
     return weights
+
+def validate_sf_calculation_units(
+    max_tension_N: float,
+    belt_width_mm: float,
+    T_allow_Npm: float,
+    sf_design: float,
+    sf_actual: float
+) -> list[str]:
+    """
+    Kiểm tra tính nhất quán của đơn vị trong tính toán Safety Factor.
+    
+    Args:
+        max_tension_N: Lực căng lớn nhất (N)
+        belt_width_mm: Bề rộng băng (mm)
+        T_allow_Npm: Sức chịu kéo cho phép (N/m)
+        sf_design: Safety Factor thiết kế
+        sf_actual: Safety Factor thực tế
+    
+    Returns:
+        Danh sách các cảnh báo về đơn vị (rỗng nếu OK)
+    """
+    warnings = []
+    
+    # Kiểm tra đơn vị lực căng
+    if max_tension_N < 100:  # Nếu < 100N, có thể đang dùng đơn vị khác
+        warnings.append(f"Lực căng max_tension = {max_tension_N:.2f} có vẻ quá thấp (kiểm tra đơn vị N)")
+    
+    # Kiểm tra bề rộng băng
+    if belt_width_mm < 100 or belt_width_mm > 3000:
+        warnings.append(f"Bề rộng băng B = {belt_width_mm}mm có vẻ không hợp lý")
+    
+    # Kiểm tra T_allow (range mới: 100,000 - 3,000,000 N/m để bao được ST-500 đến ST-3150)
+    if T_allow_Npm < 1e5 or T_allow_Npm > 3e6:
+        warnings.append(f"T_allow = {T_allow_Npm} N/m có vẻ không hợp lý (kiểm tra đơn vị)")
+    
+    # Kiểm tra SF thiết kế
+    if sf_design < 5.0 or sf_design > 15.0:
+        warnings.append(f"SF thiết kế = {sf_design} có vẻ không hợp lý")
+    
+    # Kiểm tra SF thực
+    if sf_actual < 1.0 or sf_actual > 50.0:
+        warnings.append(f"SF thực = {sf_actual} có vẻ không hợp lý")
+    
+    # Kiểm tra tính nhất quán
+    expected_sf = (belt_width_mm / 1000.0) * T_allow_Npm / max_tension_N
+    if abs(expected_sf - sf_actual) > 0.1:
+        warnings.append(f"SF thực ({sf_actual:.2f}) không khớp với tính toán ({expected_sf:.2f})")
+    
+    return warnings
 
 def get_default_spacings(width_mm: int, capacity_tph: float) -> Tuple[float, float]:
     lc_lookup_low = {
@@ -438,6 +488,7 @@ class CalculationStrategy(ABC):
                 from .optimize import calculate_belt_speed
                 
                 # Lấy đặc tính vật liệu từ UI
+                # Mapping: is_abrasive = "Granular materials", is_corrosive = "Coal and abrasive materials", is_dusty = "Hard ores, rocks and materials with sharp edges"
                 material_characteristics = {
                     'is_abrasive': getattr(self.p, 'is_abrasive', False),
                     'is_corrosive': getattr(self.p, 'is_corrosive', False),
@@ -462,6 +513,7 @@ class CalculationStrategy(ABC):
                 self.r.recommended_speed_mps = v_rec
                 self.r.cross_section_area_m2 = area_m2
                 self.r.max_speed_allowed_mps = max_speed_allowed
+                self.r.belt_width_selected_mm = self.p.B_mm  # Sửa: đảm bảo cập nhật bề rộng băng
                 
                 # Thêm cảnh báo
                 if not hasattr(self.r, 'warnings'):
@@ -487,6 +539,7 @@ class CalculationStrategy(ABC):
                 v_rec = optimize_speed(self.p.material, self.p.particle_size_mm, self.p.B_mm)
                 
                 # Lấy đặc tính vật liệu từ UI
+                # Mapping: is_abrasive = "Granular materials", is_corrosive = "Coal and abrasive materials", is_dusty = "Hard ores, rocks and materials with sharp edges"
                 material_characteristics = {
                     'is_abrasive': getattr(self.p, 'is_abrasive', False),
                     'is_corrosive': getattr(self.p, 'is_corrosive', False),
@@ -579,6 +632,12 @@ class CalculationStrategy(ABC):
             self.r.total_load_kgpm = self.r.material_load_kgpm + self.r.belt_weight_kgpm + self.r.moving_parts_weight_kgpm
             print(f"DEBUG: Fixed total_load_kgpm to {self.r.total_load_kgpm:.3f}")
         
+        # SỬA LỖI: Đảm bảo belt_width_selected_mm không bị 0
+        if not hasattr(self.r, 'belt_width_selected_mm') or self.r.belt_width_selected_mm <= 0:
+            print(f"DEBUG: FINAL CHECK: belt_width_selected_mm = {getattr(self.r, 'belt_width_selected_mm', 0)}, fixing...")
+            self.r.belt_width_selected_mm = max(self.p.B_mm, 400)  # Sử dụng giá trị từ params hoặc giá trị tối thiểu 400mm
+            print(f"DEBUG: Fixed belt_width_selected_mm to {self.r.belt_width_selected_mm}")
+        
         # --- [BẮT ĐẦU NÂNG CẤP] ---
         # Phân luồng tính toán cho truyền động đơn và kép
         if self.p.drive_type == "Dual drive":
@@ -639,7 +698,10 @@ class CalculationStrategy(ABC):
         self.r.drive_efficiency_percent = drive_eta
         self.r.efficiency = drive_eta
 
-        T_allow_Npm = self.belt_specs.get("T_allow_Npm", 6000.0)
+        # Tính T_allow_Npm từ thông số đai đã chọn thay vì dùng default 6000
+        # ST-No: T_allow_Npm = ST_No × 9.81 × 100 (ví dụ: ST-500 = 490,500 N/m)
+        # F·TS: T_allow_Npm = FTS × 9.81 × 100 (ví dụ: EP500 = 490,500 N/m)
+        T_allow_Npm = self._calculate_T_allow_from_belt_specs()
         belt_capacity_N = (self.p.B_mm / 1000.0) * T_allow_Npm
         
         # SỬA LỖI: Kiểm tra max_tension trước khi tính safety_factor
@@ -680,13 +742,61 @@ class CalculationStrategy(ABC):
             for i in range(len(self.r.distances_m))
         ]
 
-        if self.r.safety_factor < 6.0:
-            self.r.warnings.append(f"Hệ số an toàn thấp (SF = {self.r.safety_factor:.2f} < 6).")
-            if "Dây thép" not in (self.p.belt_type or ""):
-                self.r.recommendations.append("Cân nhắc tăng bề rộng hoặc chọn đai bền hơn (ST).")
+        # --- [BẮT ĐẦU SỬA LỖI SAFETY FACTOR] ---
+        # Cải thiện cảnh báo SF thực dựa trên ngưỡng từ bảng tra
+        try:
+            warning_yellow, warning_red = get_sf_warning_thresholds(self.p.belt_type)
+            
+            # Kiểm tra SF thực và đưa ra cảnh báo phù hợp
+            if self.r.safety_factor < warning_red:
+                self.r.warnings.append(f"⚠️ Hệ số an toàn thực tế QUÁ THẤP (SF = {self.r.safety_factor:.2f} < {warning_red}).")
+                if "Dây thép" not in (self.p.belt_type or ""):
+                    self.r.recommendations.append("Cân nhắc tăng bề rộng hoặc chọn đai bền hơn (ST).")
+                self.r.recommendations.append("KIỂM TRA NGAY: Thiết kế có thể không an toàn!")
+            elif self.r.safety_factor < warning_yellow:
+                self.r.warnings.append(f"⚠️ Hệ số an toàn thực tế thấp (SF = {self.r.safety_factor:.2f} < {warning_yellow}).")
+                self.r.recommendations.append("Cân nhắc kiểm tra lại thiết kế hoặc chọn đai bền hơn.")
+            else:
+                print(f"DEBUG FINALIZE: SF thực = {self.r.safety_factor:.2f} (OK, >= {warning_yellow})")
+                
+            # Thêm thông tin so sánh SF thiết kế vs SF thực
+            if hasattr(self.r, 'sf_design') and self.r.sf_design > 0:
+                sf_ratio = self.r.safety_factor / self.r.sf_design
+                if sf_ratio < 0.8:
+                    self.r.warnings.append(f"⚠️ SF thực ({self.r.safety_factor:.2f}) chỉ bằng {sf_ratio:.1%} so với SF thiết kế ({self.r.sf_design:.2f}).")
+                elif sf_ratio > 1.5:
+                    print(f"DEBUG FINALIZE: SF thực ({self.r.safety_factor:.2f}) cao hơn {sf_ratio:.1%} so với SF thiết kế ({self.r.sf_design:.2f}) - Thiết kế dư an toàn")
+                
+        except Exception as e:
+            print(f"DEBUG FINALIZE: Lỗi kiểm tra ngưỡng SF: {e}, dùng logic cũ")
+            # Fallback: logic cũ
+            if self.r.safety_factor < 6.0:
+                self.r.warnings.append(f"Hệ số an toàn thấp (SF = {self.r.safety_factor:.2f} < 6).")
+                if "Dây thép" not in (self.p.belt_type or ""):
+                    self.r.recommendations.append("Cân nhắc tăng bề rộng hoặc chọn đai bền hơn (ST).")
+        
+        # Kiểm tra mức sử dụng cường độ đai
         if self.r.belt_strength_utilization > 80.0:
             self.r.warnings.append(f"Mức sử dụng cường độ đai cao ({self.r.belt_strength_utilization:.1f}%).")
             self.r.recommendations.append("Cân nhắc tăng bề rộng băng hoặc chọn đai bền hơn.")
+        elif self.r.belt_strength_utilization < 20.0:
+            print(f"DEBUG FINALIZE: Mức sử dụng cường độ đai thấp ({self.r.belt_strength_utilization:.1f}%) - Có thể tối ưu hóa")
+            self.r.recommendations.append("Cân nhắc giảm bề rộng băng để tiết kiệm chi phí.")
+        
+        # Kiểm tra tính nhất quán của đơn vị
+        try:
+            unit_warnings = validate_sf_calculation_units(
+                max_tension_N=self.r.max_tension,
+                belt_width_mm=self.p.B_mm,
+                T_allow_Npm=T_allow_Npm,
+                sf_design=getattr(self.r, 'sf_design', 0.0),
+                sf_actual=self.r.safety_factor
+            )
+            for warning in unit_warnings:
+                self.r.warnings.append(f"🔍 {warning}")
+        except Exception as e:
+            print(f"DEBUG FINALIZE: Lỗi kiểm tra đơn vị: {e}")
+        # --- [KẾT THÚC SỬA LỖI SAFETY FACTOR] ---
 
     def _calculate_costs(self):
         cost_per_m2 = self.belt_specs.get("cost_per_m2", 50.0)
@@ -744,17 +854,52 @@ class CalculationStrategy(ABC):
 
         # Debug: in ra các giá trị để kiểm tra
         print(f"DEBUG PULLEYS: belt_type={self.p.belt_type}, is_steel_cord={is_steel_cord}")
-        print(f"DEBUG PULLEYS: max_tension={self.r.max_tension}, safety_factor={self.r.safety_factor}")
+        print(f"DEBUG PULLEYS: max_tension={self.r.max_tension}")
+
+        # --- [BẮT ĐẦU SỬA LỖI SAFETY FACTOR] ---
+        # Lấy Safety Factor thiết kế từ bảng tra
+        try:
+            sf_design = lookup_sf_design(
+                belt_type=self.p.belt_type,
+                group=getattr(self.p, "material_group", "A"),
+                lump_ge_30mm=getattr(self.p, "lump_size_ge_30mm", False),
+                duty_minutes=getattr(self.p, "duty_cycle_minutes", None)
+            )
+            self.r.sf_design = sf_design
+            print(f"DEBUG PULLEYS: SF thiết kế = {sf_design}")
+        except Exception as e:
+            print(f"DEBUG PULLEYS: Lỗi tra SF thiết kế: {e}, dùng giá trị mặc định")
+            # Fallback: dùng giá trị mặc định dựa trên loại đai
+            if is_steel_cord:
+                sf_design = 7.0  # Giá trị trung bình cho steel cord
+            else:
+                sf_design = 9.0  # Giá trị trung bình cho fabric
+            self.r.sf_design = sf_design
 
         if is_steel_cord:
+            # SỬA LỖI: Dùng SF thiết kế thay vì SF thực
             f_max_kg = self.r.max_tension / G
-            st_no_calc = f_max_kg * self.r.safety_factor / (self.p.B_mm / 10.0)
+            st_no_calc = f_max_kg * sf_design / (self.p.B_mm / 10.0)
+            self.r.required_ST = round(st_no_calc, 1)
+            print(f"DEBUG PULLEYS: ST yêu cầu = {st_no_calc:.1f}")
+            
             st_types = sorted([int(s.replace("ST-", "")) for s in PULLEY_DIAMETERS_ST_MM.keys()])
             closest_st_val = min(st_types, key=lambda x: float('inf') if x < st_no_calc else x - st_no_calc)
             st_key = f"ST-{closest_st_val}"
             if st_key in PULLEY_DIAMETERS_ST_MM:
                 dia_A = PULLEY_DIAMETERS_ST_MM[st_key]['A']
+                print(f"DEBUG PULLEYS: Chọn ST-{closest_st_val}, dia_A = {dia_A}")
         else:
+            # SỬA LỖI: Tính F·TS yêu cầu cho đai vải
+            f_max_kg = self.r.max_tension / G
+            B_cm = self.p.B_mm / 10.0
+            Be_cm = max((self.p.B_mm - 60.0) / 10.0, 1.0)  # Bề rộng hữu ích
+            
+            ft_req = f_max_kg * sf_design / Be_cm
+            self.r.required_fabric_rating = round(ft_req, 1)
+            print(f"DEBUG PULLEYS: F·TS yêu cầu = {ft_req:.1f}, B = {B_cm}cm, Be = {Be_cm}cm")
+            
+            # Chọn đai vải dựa trên rating yêu cầu
             load_level_percent = self.r.belt_strength_utilization
             if load_level_percent > 60:
                 load_category_key = "high"
@@ -769,6 +914,7 @@ class CalculationStrategy(ABC):
             
             if closest_strength_class in PULLEY_DIAMETERS_FABRIC_MM:
                 dia_A = PULLEY_DIAMETERS_FABRIC_MM[closest_strength_class][load_category_key]
+        # --- [KẾT THÚC SỬA LỖI SAFETY FACTOR] ---
         
         # Debug: in ra kết quả
         print(f"DEBUG PULLEYS: dia_A={dia_A}")
@@ -812,6 +958,46 @@ class CalculationStrategy(ABC):
         
         factor = width_map.get(closest_width_trans, 1.5)
         self.r.transition_distance_m = factor * (self.p.B_mm / 1000.0)
+
+    def _calculate_T_allow_from_belt_specs(self) -> float:
+        """
+        Tính T_allow_Npm từ thông số đai đã chọn thay vì dùng default 6000.
+        
+        Returns:
+            T_allow_Npm tính theo N/m dựa trên loại đai và rating
+        """
+        # Kiểm tra nếu đã có T_allow_Npm từ belt_specs
+        if "T_allow_Npm" in self.belt_specs:
+            return self.belt_specs["T_allow_Npm"]
+        
+        # Nếu không có, tính từ thông số đai đã chọn
+        belt_type = self.p.belt_type or ""
+        
+        # Nếu là đai dây thép (ST-No)
+        if "ST" in belt_type or "Thép" in belt_type:
+            # Tìm số ST từ belt_type (ví dụ: "ST-500" -> 500)
+            import re
+            st_match = re.search(r'ST-(\d+)', belt_type)
+            if st_match:
+                st_no = int(st_match.group(1))
+                # Công thức: T_allow_Npm = ST_No * 9.81 * 100
+                T_allow_Npm = st_no * 9.81 * 100
+                print(f"DEBUG T_allow: Tính từ ST-{st_no}: {T_allow_Npm:.0f} N/m")
+                return T_allow_Npm
+        
+        # Nếu là đai vải (F·TS)
+        if "FABRIC" in belt_type.upper() or "EP" in belt_type.upper() or "NN" in belt_type.upper():
+            # Lấy strength từ belt_specs
+            strength = self.belt_specs.get("strength", 400)
+            # Công thức: T_allow_Npm = FTS * 9.81 * 100
+            T_allow_Npm = strength * 9.81 * 100
+            print(f"DEBUG T_allow: Tính từ F·TS {strength}: {T_allow_Npm:.0f} N/m")
+            return T_allow_Npm
+        
+        # Fallback: dùng giá trị từ belt_specs nếu có
+        fallback_value = self.belt_specs.get("T_allow_Npm", 100000.0)  # Tăng từ 6000 lên 100000
+        print(f"DEBUG T_allow: Dùng fallback: {fallback_value:.0f} N/m")
+        return fallback_value
 
 
 # --------- Concrete strategies ---------
@@ -1216,6 +1402,7 @@ def select_transmission(target_velocity: float, pulley_diameter: float, motor_rp
         particle_size_mm=0.0,
         angle_repose_deg=0.0,
         material_temp_c=0.0,
+        # Mapping: is_abrasive = "Granular materials", is_corrosive = "Coal and abrasive materials", is_dusty = "Hard ores, rocks and materials with sharp edges"
         is_abrasive=False,
         is_corrosive=False,
         is_dusty=False,

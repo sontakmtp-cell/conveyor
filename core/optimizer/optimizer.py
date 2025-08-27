@@ -3,6 +3,7 @@ import random
 import copy
 import math
 import sys # Added for flushing print statements
+import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Tuple
 
@@ -59,7 +60,8 @@ class Optimizer:
                 self._mutate(child2, mutation_rate)
                 new_generation.extend([child1, child2])
             
-            self.population = new_generation
+            # Cắt tỉa dân số về đúng kích thước mong muốn
+            self.population = new_generation[:population_size]
 
         # Đánh giá lại lần cuối và trả về kết quả tốt nhất
         print("Optimizer: Final evaluation...")
@@ -74,7 +76,7 @@ class Optimizer:
         """Tạo quần thể ban đầu một cách ngẫu nhiên."""
         self.population = []
         material_info = MATERIAL_DB.get(self.base_params.material, {})
-        v_max = material_info.get('v_max', 3.0)
+        # v_max không được sử dụng trong logic khởi tạo, đã loại bỏ
         
         belt_types = list(ACTIVE_BELT_SPECS.keys())
         chain_designations = [cs.designation for cs in ACTIVE_CHAIN_SPECS if cs.designation]
@@ -136,7 +138,7 @@ class Optimizer:
     def _evaluate_population(self):
         """Đánh giá từng cá thể trong quần thể, chuẩn hóa và tính điểm fitness."""
         # Bước 1: Chạy tính toán cho các cá thể chưa được đánh giá
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=os.cpu_count() or 8) as executor:
             list(executor.map(self._evaluate_candidate, [c for c in self.population if c.calculation_result is None]))
 
         valid_candidates = [c for c in self.population if c.is_valid]
@@ -208,8 +210,8 @@ class Optimizer:
 
     def _evaluate_candidate(self, candidate: DesignCandidate):
         """Chạy core.engine.calculate và kiểm tra tính hợp lệ cho một cá thể."""
-        # Bước 1: Tối ưu hóa bề rộng và tính tốc độ tự động
-        from core.optimize import optimize_belt_width_for_capacity
+        # Bước 1: Tính tốc độ theo CHÍNH bề rộng của candidate
+        from core.optimize import calculate_belt_speed
         
         try:
             # Lấy thông số từ base_params
@@ -220,20 +222,31 @@ class Optimizer:
             trough_angle_deg = 20.0  # Default, có thể cải thiện sau
             surcharge_angle_deg = getattr(self.base_params, 'surcharge_angle_deg', 20.0) or 20.0
             
-            # Tối ưu hóa bề rộng và tính tốc độ
-            optimal_width, v_final, v_req, v_rec, area_m2, speed_warnings = optimize_belt_width_for_capacity(
-                capacity_tph, density_tpm3, particle_mm, material_name,
-                trough_angle_deg, surcharge_angle_deg
+            # Tối ưu/tính tốc độ theo CHÍNH bề rộng của candidate
+            v_final, v_req, v_rec, area_m2, speed_warnings, max_speed_allowed = calculate_belt_speed(
+                capacity_tph=capacity_tph,
+                density_tpm3=density_tpm3,
+                belt_width_mm=candidate.belt_width_mm,
+                particle_mm=particle_mm,
+                material_name=material_name,
+                trough_angle_deg=trough_angle_deg,
+                surcharge_angle_deg=surcharge_angle_deg
             )
             
-            # Sử dụng bề rộng từ candidate, nhưng tính tốc độ tự động
+            # Sử dụng bề rộng từ candidate và tốc độ được tính cho chính bề rộng đó
             params = copy.deepcopy(self.base_params)
             params.B_mm = candidate.belt_width_mm  # Giữ nguyên bề rộng từ candidate
-            params.V_mps = v_final  # Sử dụng tốc độ được tính tự động
+            params.V_mps = v_final  # Sử dụng tốc độ được tính cho chính bề rộng này
             params.belt_type = candidate.belt_type_name
             # Chế độ manual để sử dụng gearbox_ratio của candidate
             params.gearbox_ratio_mode = "manual"
             params.gearbox_ratio_user = candidate.gearbox_ratio
+            
+            # Truyền gene xích vào engine nếu engine hỗ trợ
+            if hasattr(params, "chain_selection_mode"):
+                params.chain_selection_mode = "manual"
+            if hasattr(params, "chain_spec_designation"):
+                params.chain_spec_designation = candidate.chain_spec_designation
             
             # Lưu thông tin tốc độ vào candidate để debug
             candidate.auto_calculated_speed = v_final
@@ -248,6 +261,12 @@ class Optimizer:
             params.belt_type = candidate.belt_type_name
             params.gearbox_ratio_mode = "manual"
             params.gearbox_ratio_user = candidate.gearbox_ratio
+            
+            # Truyền gene xích vào engine nếu engine hỗ trợ (fallback)
+            if hasattr(params, "chain_selection_mode"):
+                params.chain_selection_mode = "manual"
+            if hasattr(params, "chain_spec_designation"):
+                params.chain_spec_designation = candidate.chain_spec_designation
 
         try:
             print(f"DEBUG: Evaluating candidate {candidate}")
@@ -267,10 +286,11 @@ class Optimizer:
             
             # Kiểm tra safety_factor - Chỉ loại bỏ nếu quá thấp
             safety_val = getattr(result, 'safety_factor', 0)
-            if safety_val < 3.0:  # Giảm từ 8.0 xuống 3.0
-                print(f"DEBUG INVALID: {candidate} - Safety factor {safety_val} < 3.0 (too low)")
+            sf_threshold = max(1.0, float(self.settings.min_belt_safety_factor))
+            if safety_val < sf_threshold:
+                print(f"DEBUG INVALID: {candidate} - Safety factor {safety_val} < {sf_threshold} (too low)")
                 is_valid = False
-                invalid_reasons.append(f"Safety factor too low: {safety_val}")
+                invalid_reasons.append(f"Safety factor too low: {safety_val} < {sf_threshold}")
             
             # Kiểm tra budget - Chỉ loại bỏ nếu vượt quá nhiều
             if self.settings.max_budget_usd:
@@ -287,6 +307,11 @@ class Optimizer:
                         print(f"DEBUG WARNING: {candidate} - Warning: {warning} (will be penalized)")
                         invalid_reasons.append(f"Warning: {warning}")
                         # Không set is_valid = False, chỉ penalize
+            
+            # Gom speed_warnings vào invalid_reasons để bị phạt trong fitness
+            if getattr(candidate, "speed_warnings", None):
+                for w in candidate.speed_warnings:
+                    invalid_reasons.append(f"Warning: {w}")
             
             # Lưu lý do không hợp lệ để debug
             if invalid_reasons:

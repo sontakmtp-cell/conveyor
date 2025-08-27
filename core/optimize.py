@@ -67,17 +67,31 @@ def get_max_speed_from_table(belt_width_mm: int, material_characteristics: dict)
         
         # Tìm bề rộng gần nhất (có thể nhỏ hơn hoặc bằng)
         belt_width_mm = int(belt_width_mm)
-        closest_width = min(available_widths, key=lambda x: abs(x - belt_width_mm))
+        # Lọc ra các bề rộng hợp lệ (chỉ số)
+        valid_widths = []
+        for width in available_widths:
+            try:
+                valid_widths.append(int(width))
+            except (ValueError, TypeError):
+                continue
+        
+        if not valid_widths:
+            return 5.0  # Giá trị mặc định an toàn
+        
+        closest_width = min(valid_widths, key=lambda x: abs(x - belt_width_mm))
         
         # Xác định cột tốc độ dựa trên đặc tính vật liệu
         if material_characteristics.get('is_abrasive', False):
-            # Vật liệu mài mòn (cát, xi măng, bột...)
+            # Vật liệu hạt (ngũ cốc, than...) - checkbox "Granular materials"
+            speed_column = 'Granular materials (m/s)'
+        elif material_characteristics.get('is_corrosive', False):
+            # Vật liệu mài mòn (cát, xi măng, bột...) - checkbox "Coal and abrasive materials"
             speed_column = 'Coal and abrasive materials (m/s)'
         elif material_characteristics.get('is_dusty', False):
-            # Vật liệu cứng, có cạnh sắc (quặng, đá, kim loại...)
+            # Vật liệu cứng, có cạnh sắc (quặng, đá, kim loại...) - checkbox "Hard ores, rocks and materials with sharp edges"
             speed_column = 'Hard ores, rocks and materials with sharp edges (m/s)'
         else:
-            # Vật liệu hạt (ngũ cốc, than...)
+            # Mặc định: vật liệu hạt (ngũ cốc, than...)
             speed_column = 'Granular materials (m/s)'
         
         # Lấy tốc độ tối đa
@@ -85,13 +99,16 @@ def get_max_speed_from_table(belt_width_mm: int, material_characteristics: dict)
         if not row.empty:
             max_speed = row[speed_column].iloc[0]
             if pd.isna(max_speed):
-                # Nếu không có giá trị, sử dụng cột khác
+                # Nếu không có giá trị, sử dụng cột khác theo thứ tự ưu tiên:
+                # 1. Granular materials (vật liệu hạt - an toàn nhất)
+                # 2. Coal and abrasive materials (vật liệu mài mòn)
+                # 3. Hard ores, rocks and materials with sharp edges (vật liệu cứng - nguy hiểm nhất)
                 for col in ['Granular materials (m/s)', 'Coal and abrasive materials (m/s)', 'Hard ores, rocks and materials with sharp edges (m/s)']:
                     if not pd.isna(row[col].iloc[0]):
                         max_speed = row[col].iloc[0]
                         break
                 else:
-                    max_speed = 5.0  # Giá trị mặc định
+                    max_speed = 5.0  # Giá trị mặc định an toàn
             return float(max_speed)
         
         return 5.0  # Giá trị mặc định
@@ -194,8 +211,8 @@ def optimize_belt_width_for_capacity(capacity_tph: float, density_tpm3: float,
     from .specs import BELT_SPEED_SAFETY_MARGIN
     warnings = []
     
-    # Duyệt qua các bề rộng tiêu chuẩn từ nhỏ đến lớn
-    for width_mm in STANDARD_WIDTHS:
+    # Duyệt qua các bề rộng tiêu chuẩn từ nhỏ đến lớn (đã sort để đảm bảo thứ tự)
+    for width_mm in sorted(STANDARD_WIDTHS):
         try:
             v_final, v_req, v_rec, area_m2, width_warnings, max_speed_allowed = calculate_belt_speed(
                 capacity_tph, density_tpm3, width_mm, particle_mm, material_name,

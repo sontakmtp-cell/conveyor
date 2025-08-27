@@ -75,6 +75,7 @@ QFrame#card { background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; 
 QFrame#card[status="success"] { border-left:4px solid #10b981; }
 QFrame#card[status="warning"] { border-left:4px solid #f59e0b; }
 QFrame#card[status="danger"]  { border-left:4px solid #ef4444; }
+QFrame#card[status="danger"] QLabel#cardValue { color:#ef4444; }
 QLabel#cardTitle { color:#475569; font-size:11px; font-weight:600; }
 QLabel#cardValue { color:#1e293b; font-size:24px; font-weight:bold; }
 QLabel#cardSubtitle { color:#64748b; font-size:11px; }
@@ -159,6 +160,7 @@ QFrame#card { background:#1e293b; border:1px solid #334155; border-radius:12px; 
 QFrame#card[status="success"] { border-left:4px solid #10b981; }
 QFrame#card[status="warning"] { border-left:4px solid #f59e0b; }
 QFrame#card[status="danger"]  { border-left:4px solid #ef4444; }
+QFrame#card[status="danger"] QLabel#cardValue { color:#ef4444; }
 QLabel#cardTitle { color:#94a3b8; font-size:11px; font-weight:600; }
 QLabel#cardValue { color:#f8fafc; font-size:24px; font-weight:bold; }
 QLabel#cardSubtitle { color:#94a3b8; font-size:11px; }

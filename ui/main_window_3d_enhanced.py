@@ -404,7 +404,33 @@ class Enhanced3DConveyorWindow(QMainWindow):
         elif theme_name == "dark":
             self.setStyleSheet(DARK)
             self.current_theme = "dark"
+        
+        # Cập nhật màu chữ của các thẻ khi thay đổi theme
+        self._update_cards_colors()
+        
         self._redraw_all_visualizations()
+
+    def _update_cards_colors(self):
+        """Cập nhật màu chữ của các thẻ dựa trên theme và status hiện tại"""
+        if not hasattr(self, 'results') or not hasattr(self.results, 'cards'):
+            return
+            
+        cards = self.results.cards
+        for card_name in ['card_speed', 'card_power', 'card_eff', 'card_sf', 'card_cost']:
+            card = getattr(cards, card_name, None)
+            if card:
+                value_label = card.findChild(QLabel, "cardValue")
+                if value_label:
+                    status = card.property("status")
+                    if status == "danger":
+                        value_label.setStyleSheet("color: #ef4444; font-size: 24px; font-weight: bold;")
+                    elif status == "warning":
+                        value_label.setStyleSheet("color: #f59e0b; font-size: 24px; font-weight: bold;")
+                    else:  # success
+                        if self.current_theme == "dark":
+                            value_label.setStyleSheet("color: #f8fafc; font-size: 24px; font-weight: bold;")
+                        else:
+                            value_label.setStyleSheet("color: #1e293b; font-size: 24px; font-weight: bold;")
 
     def _populate_defaults(self):
         self.inputs.cbo_material.addItems(list(ACTIVE_MATERIAL_DB.keys()))
@@ -729,16 +755,38 @@ class Enhanced3DConveyorWindow(QMainWindow):
         try:
             self._update_validation_styles(r.warnings)
 
-            def set_card(card: QFrame, text: str, status: str):
+            def set_card(card: QFrame, text: str, status: str, tooltip: str = ""):
                 if not card: return
                 value_label = card.findChild(QLabel, "cardValue")
-                if value_label: value_label.setText(text)
+                if value_label: 
+                    value_label.setText(text)
+                    if tooltip:
+                        value_label.setToolTip(tooltip)
+                    else:
+                        value_label.setToolTip("")  # Xóa tooltip nếu không có
+                    
+                    # Thay đổi màu chữ dựa trên status và theme hiện tại
+                    if status == "danger":
+                        value_label.setStyleSheet("color: #ef4444; font-size: 24px; font-weight: bold;")
+                    elif status == "warning":
+                        value_label.setStyleSheet("color: #f59e0b; font-size: 24px; font-weight: bold;")
+                    else:  # success - sử dụng màu phù hợp với theme
+                        if self.current_theme == "dark":
+                            value_label.setStyleSheet("color: #f8fafc; font-size: 24px; font-weight: bold;")
+                        else:
+                            value_label.setStyleSheet("color: #1e293b; font-size: 24px; font-weight: bold;")
+                        
                 card.setProperty("status", status)
                 card.style().unpolish(card)
                 card.style().polish(card)
 
             cards = self.results.cards
-            set_card(cards.card_speed, f"{r.belt_speed_mps:.2f} m/s", "success")
+            # Kiểm tra tốc độ băng tải có vượt quá giới hạn không
+            max_speed_allowed = getattr(r, 'max_speed_allowed_mps', 0.0)
+            speed_warning = max_speed_allowed > 0 and r.belt_speed_mps > max_speed_allowed
+            speed_status = "danger" if speed_warning else "success"
+            speed_tooltip = f"⚠️ Vượt quá tốc độ tối đa cho phép ({max_speed_allowed:.2f} m/s)" if speed_warning else ""
+            set_card(cards.card_speed, f"{r.belt_speed_mps:.2f} m/s", speed_status, speed_tooltip)
             set_card(cards.card_power, f"{r.motor_power_kw:.1f} kW", "success" if r.motor_power_kw < 50 else "warning" if r.motor_power_kw < 100 else "danger")
             eff = getattr(r, "drive_efficiency_percent", getattr(r, "efficiency", 0.0))
             set_card(cards.card_eff, f"{eff:.1f} %", "success" if eff > 80 else "warning" if eff > 60 else "danger")
@@ -748,7 +796,7 @@ class Enhanced3DConveyorWindow(QMainWindow):
             # Thêm thông tin tốc độ băng vào đầu danh sách
             belt_speed = getattr(r, 'belt_speed_mps', 0.0)
             belt_speed_recommended = getattr(r, 'recommended_speed_mps', 0.0)
-            belt_width = getattr(r, 'belt_width_mm', 0)
+            belt_width = getattr(r, 'belt_width_selected_mm', 0)  # Sửa: sử dụng đúng tên trường
             
             # Kiểm tra xem có cần hiển thị cảnh báo tốc độ không
             max_speed_allowed = getattr(r, 'max_speed_allowed_mps', 0.0)
@@ -757,7 +805,7 @@ class Enhanced3DConveyorWindow(QMainWindow):
             
             if max_speed_allowed > 0 and belt_speed > max_speed_allowed:
                 speed_warning = True
-                speed_warning_message = f"⚠️ CẢNH BÁO: Tốc độ tính toán ({belt_speed:.2f} m/s) vượt quá tốc độ tối đa cho phép ({max_speed_allowed:.2f} m/s) theo bảng tra cho bề rộng {belt_width}mm. Thiết kế này KHÔNG TỐI ƯU - cần tăng bề rộng băng hoặc giảm lưu lượng."
+                speed_warning_message = f"⚠️ CẢNH BÁO: Vượt quá tốc độ tối đa cho phép ({max_speed_allowed:.2f} m/s) cho bề rộng {belt_width}mm. Cần tăng bề rộng băng hoặc giảm lưu lượng."
             
             vals = [
                 f"{belt_speed:.2f}", f"{self.inputs.cbo_width.currentText()}",
@@ -795,7 +843,7 @@ class Enhanced3DConveyorWindow(QMainWindow):
             
             # Thêm thông tin tốc độ băng
             belt_speed = getattr(r, 'belt_speed_mps', 0.0)
-            belt_width = getattr(r, 'belt_width_mm', 0)
+            belt_width = getattr(r, 'belt_width_selected_mm', 0)  # Sửa: sử dụng đúng tên trường
             
             ana_report_html += f"<p><b>- Tốc độ băng tính toán:</b> {belt_speed:.2f} m/s</p>"
             ana_report_html += f"<p><b>- Bề rộng băng được chọn:</b> {belt_width:.0f} mm</p>"

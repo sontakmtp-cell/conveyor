@@ -382,6 +382,7 @@ class InputsPanel(QWidget):
         self.spn_particle = QDoubleSpinBox(); self.spn_particle.setRange(0.1, 500); self.spn_particle.setValue(25); self.spn_particle.setSuffix(" mm")
         self.spn_angle = QDoubleSpinBox(); self.spn_angle.setRange(10, 50); self.spn_angle.setValue(35); self.spn_angle.setSuffix(" °")
         self.spn_temp = QDoubleSpinBox(); self.spn_temp.setRange(-40, 200); self.spn_temp.setValue(20); self.spn_temp.setSuffix(" °C")
+        # Mapping: is_abrasive = "Granular materials", is_corrosive = "Coal and abrasive materials", is_dusty = "Hard ores, rocks and materials with sharp edges"
         self.chk_abrasive = QCheckBox("Granular materials")
         self.chk_corrosive = QCheckBox("Coal and abrasive materials")
         self.chk_dusty = QCheckBox("Hard ores, rocks and materials with sharp edges")
@@ -520,7 +521,7 @@ class InputsPanel(QWidget):
         checkbox_layout.setContentsMargins(10, 5, 10, 5)
         
         # Thêm tiêu đề cho nhóm checkbox
-        checkbox_title = QLabel("Chọn đặc tính vật liệu:")
+        checkbox_title = QLabel("Ảnh hưởng tới tốc độ băng tải tối đa")
         checkbox_title.setStyleSheet("""
             QLabel {
                 font-weight: 600;
@@ -635,9 +636,9 @@ class InputsPanel(QWidget):
         """)
         
         # Thêm tooltip giải thích cho từng checkbox
-        self.chk_abrasive.setToolTip("Chọn nếu vật liệu có dạng hạt nhỏ như cát, xi măng, bột...")
-        self.chk_corrosive.setToolTip("Chọn nếu vật liệu có tính ăn mòn như than mỏ, muối, hóa chất...")
-        self.chk_dusty.setToolTip("Chọn nếu vật liệu cứng, có cạnh sắc như quặng, đá, kim loại...")
+        self.chk_abrasive.setToolTip("Chọn nếu vật liệu có dạng hạt nhỏ như cát, xi măng, bột... (Sử dụng cột 'Granular materials' trong bảng tra tốc độ)")
+        self.chk_corrosive.setToolTip("Chọn nếu vật liệu có tính ăn mòn như than mỏ, muối, hóa chất... (Sử dụng cột 'Coal and abrasive materials' trong bảng tra tốc độ)")
+        self.chk_dusty.setToolTip("Chọn nếu vật liệu cứng, có cạnh sắc như quặng, đá, kim loại... (Sử dụng cột 'Hard ores, rocks and materials with sharp edges' trong bảng tra tốc độ)")
         
         # Thêm các checkbox vào layout
         checkbox_layout.addWidget(self.chk_abrasive)
@@ -1538,7 +1539,7 @@ class Enhanced3DResultsPanel(QWidget):
         
         # Thêm thông tin tốc độ băng
         belt_speed = getattr(result, 'belt_speed_mps', 0.0)
-        belt_width = getattr(result, 'belt_width_mm', 0)
+        belt_width = getattr(result, 'belt_width_selected_mm', 0)  # Sửa: sử dụng đúng tên trường
         
         ana_report_html += f"<p><b>- Tốc độ băng tải:</b> {belt_speed:.2f} m/s</p>"
         ana_report_html += f"<p><b>- Bề rộng băng được chọn:</b> {belt_width:.0f} mm</p>"

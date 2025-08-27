@@ -35,7 +35,7 @@ HTML = {
     "spn_hours": "<b>Giờ chạy mỗi ngày</b><br>Dùng để ước tính điện năng.",
 
     # Băng
-    "cbo_width": "<b>Bề rộng B (mm)</b><br>Băng rộng thì chở được nhiều hơn nhưng tốn hơn.",
+    "cbo_width": "<b>Bề rộng B (mm)</b><br>Băng rộng thì chở được nhiều hơn nhưng tốn năng lượng hơn.",
     "cbo_belt_type": (
         "<b>Loại băng</b><br>"
         "Chọn vật liệu và kết cấu băng phù hợp môi trường và tải trọng.<br><br>"
@@ -112,7 +112,54 @@ HTML = {
     
     "spn_eta_m": "<b>Hiệu suất động cơ</b><br>Gần 1 là tốt.",
     "spn_eta_g": "<b>Hiệu suất hộp số</b><br>Cao thì đỡ tốn điện.",
-    "spn_mu": "<b>Độ bám băng–tang</b><br>Bám tốt thì ít trượt.",
+    "spn_mu": """
+    <div style="font-family: Segoe UI; font-size: 13px; max-width: 450px;">
+        <h4 style="margin-bottom: 5px; color: #005A9E;">Hệ số ma sát (μ) giữa băng tải và puly</h4>
+        <p style="margin-top: 0px; font-style: italic;">
+            Hệ số ma sát quyết định khả năng truyền lực kéo từ puly đến dây băng.
+        </p>
+        <table border="1" style="width:100%; border-collapse: collapse; font-size: 12px;">
+            <thead style="background-color: #E8F4FD; text-align: center;">
+                <tr>
+                    <th style="padding: 4px;">Bề mặt puly</th>
+                    <th style="padding: 4px;">Điều kiện</th>
+                    <th style="padding: 4px;">Hệ số ma sát (μ)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td rowspan="3" style="padding: 4px;"><strong>Puly thép trơn</strong></td>
+                    <td style="padding: 4px;">Bẩn và ươt</td>
+                    <td style="text-align: center; padding: 4px;">0.1</td>
+                </tr>
+                <tr>
+                    <td style="padding: 4px;">Ẩm</td>
+                    <td style="text-align: center; padding: 4px;">0.10-0.20</td>
+                </tr>
+                <tr>
+                    <td style="padding: 4px;">Khô</td>
+                    <td style="text-align: center; padding: 4px;">0.30</td>
+                </tr>
+                <tr>
+                    <td rowspan="3" style="padding: 4px;"><strong>Puly bọc cao su</strong></td>
+                    <td style="padding: 4px;">Bẩn và ướt</td>
+                    <td style="text-align: center; padding: 4px;">0.2</td>
+                </tr>
+                <tr>
+                    <td style="padding: 4px;">Ẩm</td>
+                    <td style="text-align: center; padding: 4px;">0.2 - 0.3</td>
+                </tr>
+                <tr>
+                    <td style="padding: 4px;">Khô</td>
+                    <td style="text-align: center; padding: 4px;">0.35</td>
+                </tr>
+            </tbody>
+        </table>
+        <p style="margin-top: 8px; font-size: 12px;">
+            <strong>Khuyến nghị:</strong> Sử dụng puly bọc cao su để tăng hệ số ma sát, đặc biệt quan trọng trong điều kiện vận hành ẩm ướt hoặc có nguy cơ trượt băng.
+        </p>
+    </div>
+    """,
     "spn_wrap": "<b>Góc ôm tang (°)</b><br>Ôm nhiều thì bám tốt.",
     "spn_Kt": "<b>Hệ số khởi động</b><br>Cho biết cần dư lực khi khởi động.",
 

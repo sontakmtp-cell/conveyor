@@ -53,6 +53,7 @@ class ConveyorParameters:
     particle_size_mm: float
     angle_repose_deg: float
     material_temp_c: float
+    # Mapping: is_abrasive = "Granular materials", is_corrosive = "Coal and abrasive materials", is_dusty = "Hard ores, rocks and materials with sharp edges"
     is_abrasive: bool
     is_corrosive: bool
     is_dusty: bool
@@ -102,6 +103,15 @@ class ConveyorParameters:
     V_mps: Optional[float] = None
     # --- [KẾT THÚC NÂNG CẤP TỐC ĐỘ BĂNG TỰ ĐỘNG] ---
     
+    # --- [BẮT ĐẦU NÂNG CẤP SAFETY FACTOR] ---
+    # Nhóm vật liệu cho tính toán Safety Factor: "A" (mềm/hiền) hoặc "B" (cứng/cạnh sắc)
+    material_group: str = "A"
+    # Cỡ hạt vật liệu: True nếu ≥ 30mm, False nếu < 30mm
+    lump_size_ge_30mm: bool = False
+    # Chu kỳ làm việc tính bằng phút (để tra bảng Safety Factor)
+    duty_cycle_minutes: Optional[float] = None
+    # --- [KẾT THÚC NÂNG CẤP SAFETY FACTOR] ---
+    
     db_path: str = ""
 
 @dataclass
@@ -137,6 +147,15 @@ class CalculationResult:
     safety_factor: float = 0.0
     belt_strength_utilization: float = 0.0
     capacity_utilization: float = 0.0
+    
+    # --- [BẮT ĐẦU NÂNG CẤP SAFETY FACTOR] ---
+    # Safety Factor thiết kế (đã tra bảng)
+    sf_design: float = 0.0
+    # ST yêu cầu cho đai sợi thép
+    required_ST: float = 0.0
+    # F·TS yêu cầu cho đai vải
+    required_fabric_rating: float = 0.0
+    # --- [KẾT THÚC NÂNG CẤP SAFETY FACTOR] ---
 
     drum_diameter_mm: float = 0.0
     wrap_angle_rad: float = 0.0
