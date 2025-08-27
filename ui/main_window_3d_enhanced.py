@@ -475,6 +475,8 @@ class Enhanced3DConveyorWindow(QMainWindow):
             is_abrasive=i.chk_abrasive.isChecked(),
             is_corrosive=i.chk_corrosive.isChecked(),
             is_dusty=i.chk_dusty.isChecked(),
+            material_group=i.get_material_group(),
+            belt_rating_code=i.get_belt_rating_code(),
             Qt_tph=i.spn_capacity.value(),
             L_m=i.spn_length.value(),
             H_m=i.spn_height.value(),
@@ -482,7 +484,7 @@ class Enhanced3DConveyorWindow(QMainWindow):
             V_mps=None,  # Giờ đây được tính tự động - không cần nhập tay
             operating_hours=i.spn_hours.value(),
             B_mm=int(i.cbo_width.currentText() or 0),
-            belt_type=i.cbo_belt_type.currentText(),
+            belt_type=i.get_belt_type(),
             belt_thickness_mm=i.spn_thickness.value(),
             trough_angle_label=i.cbo_trough.currentText(),
             surcharge_angle_deg=i.spn_angle.value(),  # Luôn bằng góc nghiêng tự nhiên

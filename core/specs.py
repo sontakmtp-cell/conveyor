@@ -2,9 +2,48 @@
 from typing import List
 try:
     from .models import MaterialType, BeltType
+    from .safety_factors import (
+        STEEL_CORD_STANDARD, 
+        FABRIC_STANDARD, 
+        list_fabric_codes,
+        parse_steel_code_to_T_allow_Npm,
+        parse_fabric_code_to_T_allow_Npm
+    )
 except ImportError:
     # Fallback cho trường hợp chạy trực tiếp
     from models import MaterialType, BeltType
+    # Fallback cho safety_factors
+    STEEL_CORD_STANDARD = [400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000]
+    FABRIC_STANDARD = {"EP": {160: [2], 200: [2], 250: [2], 315: [2, 3], 400: [2, 3, 4], 500: [2, 3, 4], 630: [3, 4], 800: [3, 4, 5], 1000: [4, 5], 1250: [4, 5], 1600: [5]}, "NF": {160: [2], 200: [2], 250: [2], 315: [2, 3], 400: [2, 3, 4], 500: [2, 3, 4], 630: [3, 4], 800: [3, 4, 5], 1000: [4, 5], 1250: [4, 5], 1600: [4, 5], 2000: [4, 5], 2500: [5, 6], 3150: [6]}}
+    
+    def list_fabric_codes(core: str) -> list[str]:
+        """Fallback function cho list_fabric_codes"""
+        core = core.upper()
+        if core not in FABRIC_STANDARD:
+            return []
+        out = []
+        for rating, plies in FABRIC_STANDARD[core].items():
+            for p in plies:
+                out.append(f"{core}{rating}/{p}")
+        return out
+    
+    def parse_steel_code_to_T_allow_Npm(code: str) -> float:
+        """Fallback function cho parse_steel_code_to_T_allow_Npm"""
+        code = code.strip().upper()
+        if not code.startswith("ST-"):
+            raise ValueError("Mã không phải ST-xxxx")
+        st_no = float(code.split("-")[1])
+        return st_no * 9.80665 * 100.0  # N/m
+    
+    def parse_fabric_code_to_T_allow_Npm(code: str) -> float:
+        """Fallback function cho parse_fabric_code_to_T_allow_Npm"""
+        code = code.strip().upper()
+        head, plies = code.split("/")
+        per_ply = float(''.join(c for c in head if c.isdigit()))
+        n = int(plies)
+        total_n_per_mm = per_ply * n
+        return total_n_per_mm * 1000.0  # N/m
+
 G = 9.81
 VERSION = "3.5 Professional (Enhanced Chain Support)"
 COPYRIGHT = "Mọi thắc mắc và góp ý xin gửi về haingocson@gmail.com"
@@ -53,7 +92,97 @@ BELT_SPECS = {
 
 # Trạng thái DB đang dùng (có thể thay trong runtime)
 ACTIVE_MATERIAL_DB = MATERIAL_DB.copy()
-ACTIVE_BELT_SPECS = BELT_SPECS.copy()
+
+# Cập nhật theo kế hoạch: chỉ giữ lại 2 loại băng tải chính
+# Tích hợp với hệ thống rating mới từ safety_factors.py
+ACTIVE_BELT_SPECS = {
+    "fabric": {
+        "strength": 1000, 
+        "elongation": 1.5, 
+        "temp_max": 120, 
+        "layers": [2,3,4,5,6], 
+        "T_allow_Npm": 10_000, 
+        "cost_per_m2": 45.0,
+        "rating_codes": list_fabric_codes("EP") + list_fabric_codes("NF"),  # Tất cả mã EP và NF hợp lệ
+        "parse_rating": parse_fabric_code_to_T_allow_Npm
+    },
+    "steel_cord": {
+        "strength": 2500, 
+        "elongation": 0.2, 
+        "temp_max": 150, 
+        "layers": [1], 
+        "T_allow_Npm": 20_000, 
+        "cost_per_m2": 120.0,
+        "rating_codes": [f"ST-{rating}" for rating in STEEL_CORD_STANDARD],  # Tất cả mã ST hợp lệ
+        "parse_rating": parse_steel_code_to_T_allow_Npm
+    },
+}
+
+# Hàm helper để lấy danh sách rating hợp lệ cho loại băng tải
+def get_valid_ratings_for_belt_type(belt_type: str) -> list[str]:
+    """
+    Trả về danh sách các mã rating hợp lệ cho loại băng tải.
+    
+    Args:
+        belt_type: Loại băng tải ("fabric" hoặc "steel_cord")
+    
+    Returns:
+        Danh sách các mã rating hợp lệ
+    """
+    if belt_type not in ACTIVE_BELT_SPECS:
+        return []
+    return ACTIVE_BELT_SPECS[belt_type].get("rating_codes", [])
+
+def get_rating_parser_for_belt_type(belt_type: str):
+    """
+    Trả về hàm parse rating cho loại băng tải.
+    
+    Args:
+        belt_type: Loại băng tải ("fabric" hoặc "steel_cord")
+    
+    Returns:
+        Hàm parse rating tương ứng
+    """
+    if belt_type not in ACTIVE_BELT_SPECS:
+        return None
+    return ACTIVE_BELT_SPECS[belt_type].get("parse_rating")
+
+def validate_belt_rating(belt_type: str, rating: str) -> bool:
+    """
+    Kiểm tra tính hợp lệ của mã rating cho loại băng tải.
+    
+    Args:
+        belt_type: Loại băng tải ("fabric" hoặc "steel_cord")
+        rating: Mã rating cần kiểm tra
+    
+    Returns:
+        True nếu hợp lệ, False nếu không
+    """
+    valid_ratings = get_valid_ratings_for_belt_type(belt_type)
+    return rating in valid_ratings
+
+def get_T_allow_Npm_from_rating(belt_type: str, rating: str) -> float:
+    """
+    Tính T_allow_Npm từ mã rating.
+    
+    Args:
+        belt_type: Loại băng tải ("fabric" hoặc "steel_cord")
+        rating: Mã rating
+    
+    Returns:
+        T_allow_Npm tính bằng N/m
+    
+    Raises:
+        ValueError: Nếu mã rating không hợp lệ
+    """
+    if not validate_belt_rating(belt_type, rating):
+        raise ValueError(f"Mã rating '{rating}' không hợp lệ cho loại băng tải '{belt_type}'")
+    
+    parser = get_rating_parser_for_belt_type(belt_type)
+    if parser is None:
+        raise ValueError(f"Không tìm thấy parser cho loại băng tải '{belt_type}'")
+    
+    return parser(rating)
 
 # Kiểm tra và đảm bảo ACTIVE_MATERIAL_DB không trống
 if not ACTIVE_MATERIAL_DB:

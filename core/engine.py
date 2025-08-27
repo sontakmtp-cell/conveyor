@@ -698,11 +698,24 @@ class CalculationStrategy(ABC):
         self.r.drive_efficiency_percent = drive_eta
         self.r.efficiency = drive_eta
 
-        # Tính T_allow_Npm từ thông số đai đã chọn thay vì dùng default 6000
-        # ST-No: T_allow_Npm = ST_No × 9.81 × 100 (ví dụ: ST-500 = 490,500 N/m)
-        # F·TS: T_allow_Npm = FTS × 9.81 × 100 (ví dụ: EP500 = 490,500 N/m)
+        # Tính T_allow_Npm từ thông số đai đã chọn theo kế hoạch cập nhật
         T_allow_Npm = self._calculate_T_allow_from_belt_specs()
-        belt_capacity_N = (self.p.B_mm / 1000.0) * T_allow_Npm
+        
+        # Tính belt capacity theo công thức mới:
+        # Steel cord: SF_thực = (B_m * T_allow_Npm) / Fmax_N
+        # Fabric: SF_thực = (Be_m * T_allow_Npm) / Fmax_N
+        # Trong đó: Be_m = (B_cm - 6) / 100 cho băng tải sợi vải
+        if self.p.belt_type == "steel_cord":
+            # Bề rộng hữu ích = Bề rộng thực (không trừ 6cm)
+            belt_capacity_N = (self.p.B_mm / 1000.0) * T_allow_Npm
+            print(f"DEBUG FINALIZE: Steel cord - B_m={self.p.B_mm/1000.0:.3f}m, T_allow={T_allow_Npm:.0f}N/m")
+        else:
+            # Bề rộng hữu ích = Bề rộng thực - 6cm (không nhỏ hơn 1e-6)
+            B_cm = self.p.B_mm / 10.0
+            Be_cm = max(B_cm - 6.0, 0.1)  # Không nhỏ hơn 0.1cm
+            Be_m = Be_cm / 100.0
+            belt_capacity_N = Be_m * T_allow_Npm
+            print(f"DEBUG FINALIZE: Fabric - B_cm={B_cm:.1f}cm, Be_cm={Be_cm:.1f}cm, Be_m={Be_m:.3f}m, T_allow={T_allow_Npm:.0f}N/m")
         
         # SỬA LỖI: Kiểm tra max_tension trước khi tính safety_factor
         if self.r.max_tension <= 0:
@@ -742,37 +755,59 @@ class CalculationStrategy(ABC):
             for i in range(len(self.r.distances_m))
         ]
 
-        # --- [BẮT ĐẦU SỬA LỖI SAFETY FACTOR] ---
-        # Cải thiện cảnh báo SF thực dựa trên ngưỡng từ bảng tra
+        # --- [BẮT ĐẦU TÍCH HỢP SAFETY FACTOR MỚI] ---
+        # BƯỚC 5: Tích hợp vào core/engine.py
         try:
+            # 5.1. Tính T_allow_Npm dựa trên belt_rating và belt_type
+            T_allow_Npm = self._calculate_T_allow_from_belt_specs()
+            
+            # 5.2. Tra cứu SF_thiết_kế
+            try:
+                sf_design = lookup_sf_design(
+                    belt_type=self.p.belt_type,
+                    group=getattr(self.p, 'material_group', 'A'),
+                    lump_ge_30mm=getattr(self.p, 'lump_size_ge_30mm', False),
+                    duty_minutes=getattr(self.p, 'duty_cycle_minutes', None)
+                )
+                self.r.sf_design = sf_design
+                print(f"DEBUG FINALIZE: SF thiết kế = {sf_design:.2f}")
+            except Exception as e:
+                print(f"DEBUG FINALIZE: Không thể tra SF thiết kế: {e}")
+                self.r.sf_design = 0.0
+            
+            # 5.3. So sánh và tạo cảnh báo
             warning_yellow, warning_red = get_sf_warning_thresholds(self.p.belt_type)
             
             # Kiểm tra SF thực và đưa ra cảnh báo phù hợp
             if self.r.safety_factor < warning_red:
-                self.r.warnings.append(f"⚠️ Hệ số an toàn thực tế QUÁ THẤP (SF = {self.r.safety_factor:.2f} < {warning_red}).")
-                if "Dây thép" not in (self.p.belt_type or ""):
+                self.r.warnings.append(f"🔴 Hệ số an toàn thực tế QUÁ THẤP (SF = {self.r.safety_factor:.2f} < {warning_red}).")
+                if self.p.belt_type == "fabric":
                     self.r.recommendations.append("Cân nhắc tăng bề rộng hoặc chọn đai bền hơn (ST).")
                 self.r.recommendations.append("KIỂM TRA NGAY: Thiết kế có thể không an toàn!")
             elif self.r.safety_factor < warning_yellow:
-                self.r.warnings.append(f"⚠️ Hệ số an toàn thực tế thấp (SF = {self.r.safety_factor:.2f} < {warning_yellow}).")
+                self.r.warnings.append(f"🟡 Hệ số an toàn thực tế thấp (SF = {self.r.safety_factor:.2f} < {warning_yellow}).")
                 self.r.recommendations.append("Cân nhắc kiểm tra lại thiết kế hoặc chọn đai bền hơn.")
             else:
                 print(f"DEBUG FINALIZE: SF thực = {self.r.safety_factor:.2f} (OK, >= {warning_yellow})")
                 
-            # Thêm thông tin so sánh SF thiết kế vs SF thực
-            if hasattr(self.r, 'sf_design') and self.r.sf_design > 0:
+            # So sánh SF thực vs SF thiết kế
+            if self.r.sf_design > 0:
                 sf_ratio = self.r.safety_factor / self.r.sf_design
                 if sf_ratio < 0.8:
-                    self.r.warnings.append(f"⚠️ SF thực ({self.r.safety_factor:.2f}) chỉ bằng {sf_ratio:.1%} so với SF thiết kế ({self.r.sf_design:.2f}).")
+                    self.r.warnings.append(f"🔴 SF thực ({self.r.safety_factor:.2f}) chỉ bằng {sf_ratio:.1%} so với SF thiết kế ({self.r.sf_design:.2f}).")
+                    self.r.recommendations.append("Thiết kế KHÔNG đạt yêu cầu an toàn tối thiểu!")
                 elif sf_ratio > 1.5:
                     print(f"DEBUG FINALIZE: SF thực ({self.r.safety_factor:.2f}) cao hơn {sf_ratio:.1%} so với SF thiết kế ({self.r.sf_design:.2f}) - Thiết kế dư an toàn")
+                    self.r.recommendations.append("Thiết kế dư an toàn, có thể tối ưu hóa để giảm chi phí.")
+                else:
+                    print(f"DEBUG FINALIZE: SF thực ({self.r.safety_factor:.2f}) phù hợp với SF thiết kế ({self.r.sf_design:.2f}) - Tỷ lệ {sf_ratio:.1%}")
                 
         except Exception as e:
-            print(f"DEBUG FINALIZE: Lỗi kiểm tra ngưỡng SF: {e}, dùng logic cũ")
+            print(f"DEBUG FINALIZE: Lỗi tích hợp Safety Factor mới: {e}, dùng logic cũ")
             # Fallback: logic cũ
             if self.r.safety_factor < 6.0:
                 self.r.warnings.append(f"Hệ số an toàn thấp (SF = {self.r.safety_factor:.2f} < 6).")
-                if "Dây thép" not in (self.p.belt_type or ""):
+                if self.p.belt_type == "fabric":
                     self.r.recommendations.append("Cân nhắc tăng bề rộng hoặc chọn đai bền hơn (ST).")
         
         # Kiểm tra mức sử dụng cường độ đai
@@ -796,7 +831,7 @@ class CalculationStrategy(ABC):
                 self.r.warnings.append(f"🔍 {warning}")
         except Exception as e:
             print(f"DEBUG FINALIZE: Lỗi kiểm tra đơn vị: {e}")
-        # --- [KẾT THÚC SỬA LỖI SAFETY FACTOR] ---
+        # --- [KẾT THÚC TÍCH HỢP SAFETY FACTOR MỚI] ---
 
     def _calculate_costs(self):
         cost_per_m2 = self.belt_specs.get("cost_per_m2", 50.0)
@@ -961,43 +996,47 @@ class CalculationStrategy(ABC):
 
     def _calculate_T_allow_from_belt_specs(self) -> float:
         """
-        Tính T_allow_Npm từ thông số đai đã chọn thay vì dùng default 6000.
+        Tính T_allow_Npm từ thông số đai đã chọn theo kế hoạch cập nhật.
         
         Returns:
             T_allow_Npm tính theo N/m dựa trên loại đai và rating
         """
-        # Kiểm tra nếu đã có T_allow_Npm từ belt_specs
-        if "T_allow_Npm" in self.belt_specs:
-            return self.belt_specs["T_allow_Npm"]
-        
-        # Nếu không có, tính từ thông số đai đã chọn
-        belt_type = self.p.belt_type or ""
-        
-        # Nếu là đai dây thép (ST-No)
-        if "ST" in belt_type or "Thép" in belt_type:
-            # Tìm số ST từ belt_type (ví dụ: "ST-500" -> 500)
-            import re
-            st_match = re.search(r'ST-(\d+)', belt_type)
-            if st_match:
-                st_no = int(st_match.group(1))
-                # Công thức: T_allow_Npm = ST_No * 9.81 * 100
-                T_allow_Npm = st_no * 9.81 * 100
-                print(f"DEBUG T_allow: Tính từ ST-{st_no}: {T_allow_Npm:.0f} N/m")
-                return T_allow_Npm
-        
-        # Nếu là đai vải (F·TS)
-        if "FABRIC" in belt_type.upper() or "EP" in belt_type.upper() or "NN" in belt_type.upper():
-            # Lấy strength từ belt_specs
-            strength = self.belt_specs.get("strength", 400)
-            # Công thức: T_allow_Npm = FTS * 9.81 * 100
-            T_allow_Npm = strength * 9.81 * 100
-            print(f"DEBUG T_allow: Tính từ F·TS {strength}: {T_allow_Npm:.0f} N/m")
-            return T_allow_Npm
-        
-        # Fallback: dùng giá trị từ belt_specs nếu có
-        fallback_value = self.belt_specs.get("T_allow_Npm", 100000.0)  # Tăng từ 6000 lên 100000
-        print(f"DEBUG T_allow: Dùng fallback: {fallback_value:.0f} N/m")
-        return fallback_value
+        try:
+            from .safety_factors import parse_steel_code_to_T_allow_Npm, parse_fabric_code_to_T_allow_Npm
+            
+            belt_type = self.p.belt_type or ""
+            belt_rating_code = getattr(self.p, 'belt_rating_code', None)
+            
+            # Nếu có belt_rating_code, parse trực tiếp
+            if belt_rating_code:
+                if belt_type == "steel_cord":
+                    T_allow_Npm = parse_steel_code_to_T_allow_Npm(belt_rating_code)
+                    print(f"DEBUG T_allow: Parse {belt_rating_code} -> {T_allow_Npm:.0f} N/m")
+                    return T_allow_Npm
+                else:
+                    T_allow_Npm = parse_fabric_code_to_T_allow_Npm(belt_rating_code)
+                    print(f"DEBUG T_allow: Parse {belt_rating_code} -> {T_allow_Npm:.0f} N/m")
+                    return T_allow_Npm
+            
+            # Fallback: dùng giá trị từ belt_specs nếu có
+            if "T_allow_Npm" in self.belt_specs:
+                return self.belt_specs["T_allow_Npm"]
+            
+            # Fallback cuối cùng
+            fallback_value = 100000.0
+            print(f"DEBUG T_allow: Dùng fallback: {fallback_value:.0f} N/m")
+            return fallback_value
+            
+        except Exception as e:
+            print(f"DEBUG T_allow: Lỗi parse belt rating: {e}, dùng fallback")
+            # Fallback: dùng giá trị từ belt_specs nếu có
+            if "T_allow_Npm" in self.belt_specs:
+                return self.belt_specs["T_allow_Npm"]
+            
+            # Fallback cuối cùng
+            fallback_value = 100000.0
+            print(f"DEBUG T_allow: Dùng fallback: {fallback_value:.0f} N/m")
+            return fallback_value
 
 
 # --------- Concrete strategies ---------

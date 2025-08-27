@@ -61,7 +61,7 @@ BƯỚC 1 — Cập nhật Giao diện (UI) và Mô hình dữ liệu
 1.5 Hỗ trợ mã rating mới (ST-1600, EP160/4) cho quá trình tối ưu
 1. Thêm trường `belt_rating` (chuỗi) vào `core/optimizer/models.py::DesignCandidate`.
 2. Trong `_initialize_population`, tạo `belt_rating` dựa trên rating đầu vào hoặc danh sách chuẩn (ví dụ: chọn từ “ST-1000”, “ST-1600”…).
-3. Khi xây dựng `params` trước khi gọi `calculate()`, gán `params.belt_type = candidate.belt_rating` để engine parse đúng rating.
+3. Khi xây dựng `params` trước khi gọi `calculate()`, gán `params.belt_rating = candidate.belt_rating` để engine parse đúng rating.
 4. Cập nhật `optimizer._mutate` và `_crossover` để xử lý gene `belt_rating`.
 
 1.6 Tận dụng SF_design và tỷ lệ SF_actual/SF_design trong fitness
@@ -132,7 +132,8 @@ def list_fabric_codes(core: str) -> list[str]:
 ```
 
 2A.2 HÀM PARSE MÃ RATING VÀ QUY ĐỔI VỀ T_allow_Npm
-```python
+
+
 KGF_TO_N = 9.80665
 
 def parse_steel_code_to_T_allow_Npm(code: str) -> float:
@@ -191,63 +192,63 @@ BỔ SUNG CHECKLIST LIÊN QUAN BẢNG 17 & 18
 [ ] Viết unit tests cho 2A.6.
 
 BƯỚC 3 — Chuẩn hóa lookup “SF thiết kế”
-2.1. Trong core/safety_factors.py:
+3.1. Trong core/safety_factors.py:
 - Kiểm tra lại các bảng SF_ST và SF_Fabric đã trùng khớp với bảng 19, 20 của PDF.
 - Đảm bảo logic phân loại chu kỳ khởi động (duty_cycle_minutes) là chính xác.
-2.2. Hàm lookup_sf_design(belt_type, group, lump_ge_30mm, duty_minutes):
+3.2. Hàm lookup_sf_design(belt_type, group, lump_ge_30mm, duty_minutes):
 - Chuẩn hóa tham số đầu vào (ví dụ: group viết hoa).
 - Trả về SF_thiết_kế (float) hoặc báo lỗi nếu không tìm thấy.
-2.3. Hàm get_sf_warning_thresholds(belt_type):
+3.3. Hàm get_sf_warning_thresholds(belt_type):
 - ST: cảnh báo đỏ khi SF_thực < 6.0; vàng nếu SF_thực < 7.5.
 - Fabric: đỏ khi SF_thực < 8.0; vàng nếu SF_thực < 10.0.
 
 BƯỚC 4 — Chuẩn hóa công thức tính SF_thực
-3.1. Thống nhất đơn vị nội bộ:
+4.1. Thống nhất đơn vị nội bộ:
 - Fmax: Luôn tính bằng Newton (N).
 - Rating băng tải: Quy đổi về N/m.
-3.2. Tính T_allow_Npm (sức chịu kéo cho phép trên mét chiều rộng):
+4.2. Tính T_allow_Npm (sức chịu kéo cho phép trên mét chiều rộng):
 - Steel cord: Từ ST-No (kgf/cm) → N/m. Ví dụ: ST-1000 → 980,665 N/m.
 - Fabric: Từ EP160/4 → 160 N/mm/lớp * 4 lớp = 640 N/mm → 640,000 N/m.
-3.3. Xác định bề rộng hữu ích:
+4.3. Xác định bề rộng hữu ích:
 - Be_m = (B_cm - 6) / 100 cho băng tải sợi vải.
 - B_m = B_cm / 100 cho băng tải sợi thép.
-3.4. Công thức tính SF_thực:
+4.4. Công thức tính SF_thực:
 - Steel cord: SF_thực = (B_m * T_allow_Npm) / Fmax_N
 - Fabric: SF_thực = (Be_m * T_allow_Npm) / Fmax_N
 
 BƯỚC 5 — Tích hợp vào core/engine.py
-4.1. Sau khi đã tính được max_tension (Fmax_N):
+5.1. Sau khi đã tính được max_tension (Fmax_N):
 - Tính T_allow_Npm dựa trên belt_rating và belt_type.
 - Tính SF_thực theo công thức ở BƯỚC 3.4 và gán vào result.safety_factor.
-4.2. Tra cứu SF_thiết_kế:
+5.2. Tra cứu SF_thiết_kế:
 - sf_design = lookup_sf_design(...)
 - Gán vào result.sf_design.
-4.3. So sánh và tạo cảnh báo:
+5.3. So sánh và tạo cảnh báo:
 - Lấy ngưỡng cảnh báo từ get_sf_warning_thresholds(...).
 - So sánh SF_thực với ngưỡng để thêm cảnh báo Vàng/Đỏ.
 - Tính tỉ lệ ratio = SF_thực / SF_thiết_kế và thêm cảnh báo nếu tỉ lệ quá thấp (<0.8) hoặc thông báo nếu quá an toàn (>1.5).
 
 BƯỚC 6 — Chuẩn hóa nguồn dữ liệu rating đai
-5.1. Steel cord:
+6.1. Steel cord:
 - Cho phép người dùng nhập mã dạng "ST-1600" và chương trình sẽ tự parse số 1600.
-5.2. Fabric:
+6.2. Fabric:
 - Cho phép nhập mã dạng "EP160/4" và chương trình sẽ tự parse để tính ra rating tổng.
-5.3. Nếu không xác định được rating → hiển thị cảnh báo yêu cầu người dùng cung cấp thông tin.
+6.3. Nếu không xác định được rating → hiển thị cảnh báo yêu cầu người dùng cung cấp thông tin.
 
 BƯỚC 7 — Kiểm thử (Unit & Integration)
-6.1. Unit tests cho safety_factors.lookup_sf_design với mọi trường hợp.
-6.2. Unit tests cho việc đổi đơn vị và tính Be_cm.
-6.3. Test tính SF_thực với các bộ giá trị mẫu cho cả hai loại băng tải.
-6.4. Test các ngưỡng cảnh báo và tỉ lệ SF_thực/SF_thiết_kế.
+7.1. Unit tests cho safety_factors.lookup_sf_design với mọi trường hợp.
+7.2. Unit tests cho việc đổi đơn vị và tính Be_cm.
+7.3. Test tính SF_thực với các bộ giá trị mẫu cho cả hai loại băng tải.
+7.4. Test các ngưỡng cảnh báo và tỉ lệ SF_thực/SF_thiết_kế.
 
 BƯỚC 8 — Nhật ký, UI và Báo cáo
-7.1. Ghi log các giá trị trung gian để dễ dàng debug.
-7.2. UI hiển thị trạng thái an toàn rõ ràng (OK/Cảnh báo/Nguy hiểm).
-7.3. Báo cáo PDF/Excel phải bao gồm bảng tóm tắt về hệ số an toàn.
+8.1. Ghi log các giá trị trung gian để dễ dàng debug.
+8.2. UI hiển thị trạng thái an toàn rõ ràng (OK/Cảnh báo/Nguy hiểm).
+8.3. Báo cáo PDF/Excel phải bao gồm bảng tóm tắt về hệ số an toàn.
 
 BƯỚC 9 — Tương thích ngược và Cấu hình
-8.1. Nếu thiếu thông tin, sử dụng giá trị mặc định hợp lý.
-8.2. Cho phép cấu hình các ngưỡng cảnh báo trong file config thay vì hard-code.
+9.1. Nếu thiếu thông tin, sử dụng giá trị mặc định hợp lý.
+9.2. Cho phép cấu hình các ngưỡng cảnh báo trong file config thay vì hard-code.
 
 CHECKLIST THỰC THI
 [ ] 1. Cập nhật UI: Giới hạn ComboBox và thêm logic cho CheckBox vật liệu.

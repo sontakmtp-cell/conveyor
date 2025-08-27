@@ -7,6 +7,81 @@ Dựa trên tiêu chuẩn và hướng dẫn tính toán băng tải
 from typing import Optional, Union
 
 # =========================
+# BẢNG TRA TIÊU CHUẨN BĂNG TẢI (Bảng 17 & 18 từ PDF)
+# =========================
+
+# Bảng 17 — Steel cord (đơn vị kgf/cm theo bề rộng)
+STEEL_CORD_STANDARD = [
+    400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000
+]
+# Ý nghĩa: ST-{value}, ví dụ ST-1600 nghĩa là 1600 kgf/cm.
+
+# Bảng 18 — Fabric (EP/NF): rating mỗi lớp (N/mm) và các tổ hợp số lớp hợp lệ
+FABRIC_STANDARD = {
+    "EP": {  # Polyester (EP) – rating per ply (N/mm): allowed plies
+        160: [2],
+        200: [2],
+        250: [2],
+        315: [2, 3],
+        400: [2, 3, 4],
+        500: [2, 3, 4],
+        630: [3, 4],
+        800: [3, 4, 5],
+        1000: [4, 5],
+        1250: [4, 5],
+        1600: [5],
+    },
+    "NF": {  # Nylon (NN/NF) – rating per ply (N/mm): allowed plies
+        160: [2],
+        200: [2],
+        250: [2],
+        315: [2, 3],
+        400: [2, 3, 4],
+        500: [2, 3, 4],
+        630: [3, 4],
+        800: [3, 4, 5],
+        1000: [4, 5],
+        1250: [4, 5],
+        1600: [4, 5],
+        2000: [4, 5],
+        2500: [5, 6],
+        3150: [6],
+    },
+}
+
+# Hằng số chuyển đổi đơn vị
+KGF_TO_N = 9.80665
+
+def list_fabric_codes(core: str) -> list[str]:
+    """Trợ giúp UI liệt kê nhanh các mã dạng 'EP160/2', 'NF500/4'."""
+    core = core.upper()
+    if core not in FABRIC_STANDARD:
+        return []
+    out = []
+    for rating, plies in FABRIC_STANDARD[core].items():
+        for p in plies:
+            out.append(f"{core}{rating}/{p}")
+    return out
+
+def parse_steel_code_to_T_allow_Npm(code: str) -> float:
+    """'ST-1600' → 1600 kgf/cm → N/m = 1600 * 9.80665 * 100."""
+    code = code.strip().upper()
+    if not code.startswith("ST-"):
+        raise ValueError("Mã không phải ST-xxxx")
+    st_no = float(code.split("-")[1])
+    return st_no * KGF_TO_N * 100.0  # N/m
+
+def parse_fabric_code_to_T_allow_Npm(code: str) -> float:
+    """'EP160/4' hoặc 'NF630/3' → (160*4) N/mm → N/m = (N/mm)*1000."""
+    code = code.strip().upper()
+    # ví dụ head='EP160', plies='4'
+    head, plies = code.split("/")
+    per_ply = float(''.join(c for c in head if c.isdigit()))  # 160 từ EP160
+    n = int(plies)
+    total_n_per_mm = per_ply * n
+    return total_n_per_mm * 1000.0  # N/m
+
+# =========================
 # SAFETY FACTOR LOOKUP TABLES (from PDF)
 # =========================
 # Keys:
@@ -60,7 +135,7 @@ def _bucketize_duty_minutes(belt_type: str, duty_minutes: Optional[float]) -> st
     Trả về bucket chu kỳ theo bảng (đơn vị phút).
     
     Args:
-        belt_type: Loại đai ("steel", "steel_cord", "st", "dây thép" hoặc fabric)
+        belt_type: Loại đai ("fabric" hoặc "steel_cord")
         duty_minutes: Chu kỳ làm việc tính bằng phút
     
     Returns:
@@ -68,7 +143,7 @@ def _bucketize_duty_minutes(belt_type: str, duty_minutes: Optional[float]) -> st
     """
     m = float(duty_minutes or 0)
     
-    if (belt_type or "").lower() in {"steel", "steel_cord", "st", "dây thép", "steel cord"}:
+    if belt_type == "steel_cord":
         if m < 3.0:
             return "<3"
         elif m <= 10.0:
@@ -107,7 +182,7 @@ def lookup_sf_design(
     Tra hệ số an toàn THIẾT KẾ (SF hoặc SFz) đúng bảng PDF.
     
     Args:
-        belt_type: Loại đai ("steel", "steel_cord", "st", "dây thép" hoặc fabric)
+        belt_type: Loại đai ("fabric" hoặc "steel_cord")
         group: Nhóm vật liệu "A" (mềm/hiền) hoặc "B" (cứng/cạnh sắc)
         lump_ge_30mm: True nếu cỡ hạt ≥ 30 mm
         duty_minutes: Chu kỳ làm việc tính bằng phút
@@ -122,7 +197,7 @@ def lookup_sf_design(
     lump = _normalize_lump(lump_ge_30mm)
     bucket = _bucketize_duty_minutes(belt_type, duty_minutes)
 
-    if (belt_type or "").lower() in {"steel", "steel_cord", "st", "dây thép", "steel cord"}:
+    if belt_type == "steel_cord":
         key = (g, lump, bucket)
         if key not in STEEL_CORD_SF:
             raise KeyError(f"Không tìm thấy SF cho steel cord với key: {key}")
@@ -139,12 +214,12 @@ def get_sf_warning_thresholds(belt_type: str) -> tuple[float, float]:
     Trả về ngưỡng cảnh báo cho SF thực.
     
     Args:
-        belt_type: Loại đai
+        belt_type: Loại đai ("fabric" hoặc "steel_cord")
     
     Returns:
         Tuple (warning_yellow, warning_red): Ngưỡng cảnh báo vàng và đỏ
     """
-    if (belt_type or "").lower() in {"steel", "steel_cord", "st", "dây thép", "steel cord"}:
+    if belt_type == "steel_cord":
         # Đai sợi thép: SF thực < 6 thì cảnh báo đỏ
         return 7.5, 6.0
     else:

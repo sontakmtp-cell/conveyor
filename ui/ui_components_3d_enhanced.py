@@ -402,6 +402,22 @@ class InputsPanel(QWidget):
         # Belt
         self.cbo_width = QComboBox()
         self.cbo_belt_type = QComboBox()
+        # Cập nhật theo kế hoạch: chỉ 2 loại băng tải chính
+        self.cbo_belt_type.addItems(["Băng tải sợi vải (Fabric)", "Băng tải sợi thép (Steel Cord)"])
+        
+        # Thêm các trường cho belt rating theo kế hoạch
+        self.cbo_belt_core = QComboBox()  # EP, NF cho fabric; ST cho steel cord
+        self.cbo_belt_rating = QComboBox()  # Rating per ply cho fabric; ST number cho steel cord
+        self.cbo_belt_plies = QComboBox()   # Số lớp cho fabric (không dùng cho steel cord)
+        
+        # Kết nối signal để cập nhật belt rating options
+        self.cbo_belt_type.currentTextChanged.connect(self._update_belt_rating_options)
+        self.cbo_belt_core.currentTextChanged.connect(self._update_belt_rating_options)
+        self.cbo_belt_rating.currentTextChanged.connect(self._update_plies_options)
+        
+        # Khởi tạo options ban đầu
+        self._update_belt_rating_options()
+        
         self.spn_thickness = QDoubleSpinBox(); self.spn_thickness.setRange(5, 50); self.spn_thickness.setValue(12); self.spn_thickness.setSuffix(" mm")
         self.cbo_trough = QComboBox(); self.cbo_trough.addItems(["0° (phẳng)","10°","15°","20°","25°","30°","35°","40°","45°"])
         self.spn_surcharge = QDoubleSpinBox(); self.spn_surcharge.setRange(10, 45); self.spn_surcharge.setValue(20); self.spn_surcharge.setDecimals(1); self.spn_surcharge.setSuffix(" °")
@@ -646,7 +662,125 @@ class InputsPanel(QWidget):
         checkbox_layout.addWidget(self.chk_dusty)
         
         f.addRow("Đặc tính vật liệu:", checkbox_container)
+        
+        # Kết nối signal để tự động xác định material group
+        self.chk_abrasive.toggled.connect(self._update_material_group)
+        self.chk_corrosive.toggled.connect(self._update_material_group)
+        self.chk_dusty.toggled.connect(self._update_material_group)
+        
         return g
+
+    def _update_material_group(self):
+        """Tự động xác định material group dựa trên các checkbox vật liệu"""
+        # Logic theo kế hoạch: ưu tiên nhóm B nếu có vật liệu cứng
+        if self.chk_dusty.isChecked():
+            # "Hard ores, rocks and materials with sharp edges" → nhóm B
+            self._current_material_group = "B"
+        elif self.chk_abrasive.isChecked() or self.chk_corrosive.isChecked():
+            # "Granular materials" hoặc "Coal and abrasive materials" → nhóm A
+            self._current_material_group = "A"
+        else:
+            # Mặc định nhóm A nếu không có checkbox nào được chọn
+            self._current_material_group = "A"
+        
+        # Debug log
+        print(f"DEBUG: Material group updated to {self._current_material_group}")
+        print(f"  - Abrasive: {self.chk_abrasive.isChecked()}")
+        print(f"  - Corrosive: {self.chk_corrosive.isChecked()}")
+        print(f"  - Dusty: {self.chk_dusty.isChecked()}")
+
+    def get_material_group(self) -> str:
+        """Trả về material group hiện tại"""
+        return getattr(self, '_current_material_group', 'A')
+
+    def get_belt_type(self) -> str:
+        """Trả về belt_type dưới dạng chuỗi chuẩn cho engine"""
+        current_text = self.cbo_belt_type.currentText()
+        if "sợi thép" in current_text or "Steel Cord" in current_text:
+            return "steel_cord"
+        else:
+            return "fabric"  # Mặc định
+
+    def _update_belt_rating_options(self):
+        """Cập nhật các options cho belt rating dựa trên loại băng tải và core được chọn"""
+        try:
+            from core.safety_factors import STEEL_CORD_STANDARD, FABRIC_STANDARD
+            
+            belt_type = self.get_belt_type()
+            
+            if belt_type == "steel_cord":
+                # Steel cord: chỉ có ST
+                self.cbo_belt_core.clear()
+                self.cbo_belt_core.addItems(["ST"])
+                self.cbo_belt_core.setCurrentText("ST")
+                
+                # Rating: các số ST tiêu chuẩn
+                self.cbo_belt_rating.clear()
+                self.cbo_belt_rating.addItems([str(rating) for rating in STEEL_CORD_STANDARD])
+                self.cbo_belt_rating.setCurrentText("1600")  # Mặc định
+                
+                # Số lớp: không dùng cho steel cord
+                self.cbo_belt_plies.clear()
+                self.cbo_belt_plies.addItems(["1"])
+                self.cbo_belt_plies.setCurrentText("1")
+                self.cbo_belt_plies.setEnabled(False)
+                
+            else:
+                # Fabric: EP hoặc NF
+                self.cbo_belt_core.clear()
+                self.cbo_belt_core.addItems(["EP", "NF"])
+                self.cbo_belt_core.setCurrentText("EP")
+                
+                # Rating: dựa trên core được chọn
+                core = self.cbo_belt_core.currentText()
+                if core in FABRIC_STANDARD:
+                    ratings = [str(rating) for rating in FABRIC_STANDARD[core].keys()]
+                    self.cbo_belt_rating.clear()
+                    self.cbo_belt_rating.addItems(ratings)
+                    self.cbo_belt_rating.setCurrentText("400")  # Mặc định
+                    
+                    # Số lớp: dựa trên rating được chọn
+                    self._update_plies_options()
+                else:
+                    self.cbo_belt_rating.clear()
+                    self.cbo_belt_plies.clear()
+                
+                self.cbo_belt_plies.setEnabled(True)
+                
+        except Exception as e:
+            print(f"Error updating belt rating options: {e}")
+
+    def _update_plies_options(self):
+        """Cập nhật options cho số lớp dựa trên core và rating được chọn"""
+        try:
+            from core.safety_factors import FABRIC_STANDARD
+            
+            core = self.cbo_belt_core.currentText()
+            rating = int(self.cbo_belt_rating.currentText())
+            
+            if core in FABRIC_STANDARD and rating in FABRIC_STANDARD[core]:
+                plies = FABRIC_STANDARD[core][rating]
+                self.cbo_belt_plies.clear()
+                self.cbo_belt_plies.addItems([str(p) for p in plies])
+                self.cbo_belt_plies.setCurrentText(str(plies[0]))  # Chọn số lớp đầu tiên
+            else:
+                self.cbo_belt_plies.clear()
+                
+        except Exception as e:
+            print(f"Error updating belt rating options: {e}")
+
+    def get_belt_rating_code(self) -> str:
+        """Trả về mã belt rating dưới dạng chuỗi chuẩn (ST-1600, EP400/4, etc.)"""
+        belt_type = self.get_belt_type()
+        
+        if belt_type == "steel_cord":
+            rating = self.cbo_belt_rating.currentText()
+            return f"ST-{rating}"
+        else:
+            core = self.cbo_belt_core.currentText()
+            rating = self.cbo_belt_rating.currentText()
+            plies = self.cbo_belt_plies.currentText()
+            return f"{core}{rating}/{plies}"
 
     def _operating_group(self) -> QGroupBox:
         g = QGroupBox("Điều kiện vận hành")
@@ -672,6 +806,9 @@ class InputsPanel(QWidget):
         f = QFormLayout(g)
         f.addRow("Bề rộng băng:", self.cbo_width)
         f.addRow("Loại băng:", self.cbo_belt_type)
+        f.addRow("Core:", self.cbo_belt_core)
+        f.addRow("Rating:", self.cbo_belt_rating)
+        f.addRow("Số lớp:", self.cbo_belt_plies)
         f.addRow("Độ dày băng:", self.spn_thickness)
         f.addRow("Góc máng:", self.cbo_trough)
         # f.addRow("Góc chất tải:", self.spn_surcharge)  # Ẩn góc chất tải - luôn bằng góc nghiêng tự nhiên

@@ -110,6 +110,8 @@ class ConveyorParameters:
     lump_size_ge_30mm: bool = False
     # Chu kỳ làm việc tính bằng phút (để tra bảng Safety Factor)
     duty_cycle_minutes: Optional[float] = None
+    # Mã belt rating (ST-1600, EP400/4, etc.) để parse T_allow_Npm
+    belt_rating_code: Optional[str] = None
     # --- [KẾT THÚC NÂNG CẤP SAFETY FACTOR] ---
     
     db_path: str = ""
