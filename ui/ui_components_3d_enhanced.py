@@ -636,9 +636,9 @@ class InputsPanel(QWidget):
         """)
         
         # Thêm tooltip giải thích cho từng checkbox
-        self.chk_abrasive.setToolTip("Chọn nếu vật liệu có dạng hạt nhỏ như cát, xi măng, bột... (Sử dụng cột 'Granular materials' trong bảng tra tốc độ)")
-        self.chk_corrosive.setToolTip("Chọn nếu vật liệu có tính ăn mòn như than mỏ, muối, hóa chất... (Sử dụng cột 'Coal and abrasive materials' trong bảng tra tốc độ)")
-        self.chk_dusty.setToolTip("Chọn nếu vật liệu cứng, có cạnh sắc như quặng, đá, kim loại... (Sử dụng cột 'Hard ores, rocks and materials with sharp edges' trong bảng tra tốc độ)")
+        self.chk_abrasive.setToolTip("Chọn nếu vật liệu có dạng hạt nhỏ như cát, xi măng, bột...")
+        self.chk_corrosive.setToolTip("Chọn nếu vật liệu có tính bào mòn như than mỏ, gỗ dăm, hóa chất ăn mòn...")
+        self.chk_dusty.setToolTip("Chọn nếu vật liệu cứng, có cạnh sắc như quặng, đá, kim loại...")
         
         # Thêm các checkbox vào layout
         checkbox_layout.addWidget(self.chk_abrasive)
@@ -994,9 +994,13 @@ class Enhanced3DResultsPanel(QWidget):
         l_opt = QVBoxLayout(w_opt)
         self.tbl_optimizer_results = QTableWidget()
         self.tbl_optimizer_results.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.tbl_optimizer_results.setSelectionBehavior(QTableWidget.SelectRows)
+        self.tbl_optimizer_results.setSelectionBehavior(QTableWidget.SelectColumns)
         self.tbl_optimizer_results.setAlternatingRowColors(True)
         self.tbl_optimizer_results.doubleClicked.connect(self._on_optimizer_result_selected)
+        # Cải thiện hiển thị cho cấu trúc mới
+        self.tbl_optimizer_results.verticalHeader().setVisible(False)  # Ẩn header hàng
+        self.tbl_optimizer_results.horizontalHeader().setStretchLastSection(True)  # Căng cột cuối
+        self.tbl_optimizer_results.setWordWrap(True)  # Cho phép wrap text
         l_opt.addWidget(self.tbl_optimizer_results)
         self.tabs.insertTab(0, w_opt, "🏆 Kết quả Tối ưu")
         self._optimizer_results_data = [] # To store the list of DesignCandidate
@@ -1306,59 +1310,161 @@ class Enhanced3DResultsPanel(QWidget):
         self._optimizer_results_data = results
         self.tbl_optimizer_results.clear()
         
-        headers = ["Rank", "Điểm Fitness", "Bề rộng (mm)", "Tốc độ tính (m/s)", "Loại băng", "Sai số vận tốc (%)", "Mã nhông xích", "Tổng chi phí ($)", "Công suất (kW)", "HS An toàn Băng", "HS An toàn Xích"]
-        self.tbl_optimizer_results.setColumnCount(len(headers))
-        self.tbl_optimizer_results.setHorizontalHeaderLabels(headers)
-        self.tbl_optimizer_results.setRowCount(len(results))
-
+        if not results:
+            # Hiển thị thông báo khi không có kết quả
+            self.tbl_optimizer_results.setRowCount(1)
+            self.tbl_optimizer_results.setColumnCount(1)
+            no_result_item = QTableWidgetItem("Không có kết quả tối ưu hóa")
+            no_result_item.setBackground(QColor("#fef2f2"))
+            no_result_item.setForeground(QColor("#dc2626"))
+            no_result_item.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+            no_result_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.tbl_optimizer_results.setItem(0, 0, no_result_item)
+            self.tbl_optimizer_results.resizeColumnsToContents()
+            self.tbl_optimizer_results.resizeRowsToContents()
+            return
+            
+        # Định nghĩa các tham số cần hiển thị (mỗi tham số là một hàng)
+        parameter_rows = [
+            ("Rank", "rank"),
+            ("Điểm Fitness", "fitness_score"),
+            ("Bề rộng (mm)", "belt_width_mm"),
+            ("Tốc độ tính (m/s)", "belt_speed_mps"),
+            ("Loại băng", "belt_type_name"),
+            ("Tỉ số truyền hộp số", "gearbox_ratio"),
+            ("Mã nhông xích", "chain_designation"),
+            ("Sai số vận tốc (%)", "velocity_error_percent"),
+            ("Tổng chi phí ($)", "cost_capital_total"),
+            ("Công suất (kW)", "required_power_kw"),
+            ("HS An toàn Băng", "safety_factor"),
+            ("HS An toàn Xích", "chain_safety_margin")
+        ]
+        
+        # Số cột = số candidate + 1 (cột đầu tiên là tên tham số)
+        num_candidates = len(results)
+        self.tbl_optimizer_results.setColumnCount(num_candidates + 1)
+        self.tbl_optimizer_results.setRowCount(len(parameter_rows))
+        
+        # Đặt header cho cột đầu tiên (tên tham số)
+        header_param = QTableWidgetItem("Tham số")
+        header_param.setBackground(QColor("#1e293b"))
+        header_param.setForeground(QColor("#ffffff"))
+        header_param.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        self.tbl_optimizer_results.setHorizontalHeaderItem(0, header_param)
+        
+        # Đặt header cho các cột candidate
         for i, candidate in enumerate(results):
-            res = candidate.calculation_result
-            trans = getattr(res, 'transmission_solution', None)
-
-            self.tbl_optimizer_results.setItem(i, 0, QTableWidgetItem(str(i + 1)))
-            self.tbl_optimizer_results.setItem(i, 1, QTableWidgetItem(f"{candidate.fitness_score:.4f}"))
-            self.tbl_optimizer_results.setItem(i, 2, QTableWidgetItem(str(candidate.belt_width_mm)))
-            belt_speed = getattr(res, 'belt_speed_mps', 0.0)
-            self.tbl_optimizer_results.setItem(i, 3, QTableWidgetItem(f"{belt_speed:.2f}"))
-            self.tbl_optimizer_results.setItem(i, 4, QTableWidgetItem(candidate.belt_type_name))
+            header_item = QTableWidgetItem(f"Candidate {i + 1}")
+            header_item.setBackground(QColor("#3b82f6"))
+            header_item.setForeground(QColor("#ffffff"))
+            header_item.setFont(QFont("Arial", 9, QFont.Weight.Bold))
+            header_item.setToolTip(f"Rank: {i + 1}, Fitness: {candidate.fitness_score:.4f}")
+            self.tbl_optimizer_results.setHorizontalHeaderItem(i + 1, header_item)
+        
+        # Điền dữ liệu cho từng hàng (tham số)
+        for row_idx, (param_name, param_key) in enumerate(parameter_rows):
+            # Cột đầu tiên: tên tham số
+            param_item = QTableWidgetItem(param_name)
+            param_item.setBackground(QColor("#f8fafc"))
+            param_item.setFont(QFont("Arial", 9, QFont.Weight.Bold))
+            self.tbl_optimizer_results.setItem(row_idx, 0, param_item)
             
-            # Thêm cột Sai số vận tốc
-            velocity_error = getattr(trans, 'velocity_error_percent', 0.0) if trans else 0.0
-            velocity_error_item = QTableWidgetItem(f"{velocity_error:.2f} %")
-            # Nếu sai số > 10% thì hiển thị màu đỏ cảnh báo
-            if velocity_error > 10.0:
-                velocity_error_item.setBackground(QColor("#fef2f2"))
-                velocity_error_item.setForeground(QColor("#dc2626"))
-                velocity_error_item.setToolTip("⚠️ CẢNH BÁO: Sai số vượt quá 10%, hãy thay đổi tỉ số truyền hộp số")
-            self.tbl_optimizer_results.setItem(i, 5, velocity_error_item)
-            
-            # Thêm cột Mã nhông xích
-            chain_designation = getattr(trans, 'chain_designation', 'N/A') if trans else 'N/A'
-            # Loại bỏ phần "(ANSI/ISO)" khỏi hiển thị
-            if chain_designation != 'N/A' and chain_designation.endswith(' (ANSI/ISO)'):
-                chain_designation = chain_designation.replace(' (ANSI/ISO)', '')
-            elif chain_designation != 'N/A' and chain_designation.endswith(' (ANSI)'):
-                chain_designation = chain_designation.replace(' (ANSI)', '')
-            elif chain_designation != 'N/A' and chain_designation.endswith(' (ISO)'):
-                chain_designation = chain_designation.replace(' (ISO)', '')
-            self.tbl_optimizer_results.setItem(i, 6, QTableWidgetItem(chain_designation))
-            
-            self.tbl_optimizer_results.setItem(i, 7, QTableWidgetItem(f"{getattr(res, 'cost_capital_total', 0):,.0f}"))
-            self.tbl_optimizer_results.setItem(i, 8, QTableWidgetItem(f"{getattr(res, 'required_power_kw', 0):.2f}"))
-            self.tbl_optimizer_results.setItem(i, 9, QTableWidgetItem(f"{getattr(res, 'safety_factor', 0):.2f}"))
-            self.tbl_optimizer_results.setItem(i, 10, QTableWidgetItem(f"{getattr(trans, 'safety_margin', 0):.2f}" if trans else "N/A"))
+            # Các cột candidate: giá trị tham số
+            for col_idx, candidate in enumerate(results):
+                res = candidate.calculation_result
+                trans = getattr(res, 'transmission_solution', None)
+                
+                # Lấy giá trị dựa trên param_key
+                if param_key == "rank":
+                    value = str(col_idx + 1)
+                elif param_key == "fitness_score":
+                    value = f"{candidate.fitness_score:.4f}"
+                elif param_key == "belt_width_mm":
+                    value = str(candidate.belt_width_mm)
+                elif param_key == "belt_speed_mps":
+                    belt_speed = getattr(res, 'belt_speed_mps', 0.0)
+                    value = f"{belt_speed:.2f}"
+                elif param_key == "belt_type_name":
+                    value = candidate.belt_type_name
+                elif param_key == "gearbox_ratio":
+                    value = f"{candidate.gearbox_ratio:.2f}"
+                elif param_key == "chain_designation":
+                    chain_designation = getattr(trans, 'chain_designation', 'N/A') if trans else 'N/A'
+                    # Loại bỏ phần "(ANSI/ISO)" khỏi hiển thị
+                    if chain_designation != 'N/A' and chain_designation.endswith(' (ANSI/ISO)'):
+                        chain_designation = chain_designation.replace(' (ANSI/ISO)', '')
+                    elif chain_designation != 'N/A' and chain_designation.endswith(' (ANSI)'):
+                        chain_designation = chain_designation.replace(' (ANSI)', '')
+                    elif chain_designation != 'N/A' and chain_designation.endswith(' (ISO)'):
+                        chain_designation = chain_designation.replace(' (ISO)', '')
+                    value = chain_designation
+                elif param_key == "velocity_error_percent":
+                    velocity_error = getattr(trans, 'velocity_error_percent', 0.0) if trans else 0.0
+                    value = f"{velocity_error:.2f} %"
+                elif param_key == "cost_capital_total":
+                    value = f"{getattr(res, 'cost_capital_total', 0):,.0f}"
+                elif param_key == "required_power_kw":
+                    value = f"{getattr(res, 'required_power_kw', 0):.2f}"
+                elif param_key == "safety_factor":
+                    value = f"{getattr(res, 'safety_factor', 0):.2f}"
+                elif param_key == "chain_safety_margin":
+                    value = f"{getattr(trans, 'safety_margin', 0):.2f}" if trans else "N/A"
+                else:
+                    value = "N/A"
+                
+                # Tạo item và áp dụng định dạng đặc biệt
+                item = QTableWidgetItem(value)
+                
+                # Định dạng đặc biệt cho một số tham số
+                if param_key == "velocity_error_percent":
+                    velocity_error_val = getattr(trans, 'velocity_error_percent', 0.0) if trans else 0.0
+                    if velocity_error_val > 10.0:
+                        item.setBackground(QColor("#fef2f2"))
+                        item.setForeground(QColor("#dc2626"))
+                        item.setToolTip("⚠️ CẢNH BÁO: Sai số vượt quá 10%, hãy thay đổi tỉ số truyền hộp số")
+                
+                elif param_key == "fitness_score":
+                    # Màu xanh cho fitness score thấp (tốt)
+                    if candidate.fitness_score < 1000:
+                        item.setBackground(QColor("#f0fdf4"))
+                        item.setForeground(QColor("#166534"))
+                    elif candidate.fitness_score < 5000:
+                        item.setBackground(QColor("#fefce8"))
+                        item.setForeground(QColor("#a16207"))
+                
+                elif param_key == "safety_factor":
+                    # Màu cảnh báo cho safety factor thấp
+                    sf_val = getattr(res, 'safety_factor', 0)
+                    if sf_val < 5.0:
+                        item.setBackground(QColor("#fef2f2"))
+                        item.setForeground(QColor("#dc2626"))
+                        item.setToolTip("⚠️ CẢNH BÁO: Safety Factor thấp")
+                    elif sf_val < 8.0:
+                        item.setBackground(QColor("#fefce8"))
+                        item.setForeground(QColor("#a16207"))
+                        item.setToolTip("⚠️ CẢNH BÁO: Safety Factor trung bình")
+                
+                self.tbl_optimizer_results.setItem(row_idx, col_idx + 1, item)
 
         self.tbl_optimizer_results.resizeColumnsToContents()
+        self.tbl_optimizer_results.resizeRowsToContents()
+        
+        # Cải thiện hiển thị
+        self.tbl_optimizer_results.setColumnWidth(0, 200)  # Cột tham số rộng hơn
+        for i in range(1, num_candidates + 1):
+            self.tbl_optimizer_results.setColumnWidth(i, 120)  # Các cột candidate đều nhau
+        
         self.tabs.setCurrentIndex(0) # Chuyển sang tab kết quả tối ưu
+    # --- [KẾT THÚC NÂNG CẤP TỐI ƯU HÓA] ---
 
     @Slot()
     def _on_optimizer_result_selected(self, model_index):
         """Xử lý khi người dùng double-click vào một kết quả."""
-        selected_row = model_index.row()
-        if 0 <= selected_row < len(self._optimizer_results_data):
-            selected_candidate = self._optimizer_results_data[selected_row]
+        selected_col = model_index.column()
+        # Bỏ qua cột đầu tiên (cột tên tham số)
+        if selected_col > 0 and selected_col - 1 < len(self._optimizer_results_data):
+            selected_candidate = self._optimizer_results_data[selected_col - 1]
             self.optimizer_result_selected.emit(selected_candidate)
-    # --- [KẾT THÚC NÂNG CẤP TỐI ƯU HÓA] ---
 
     def update_visualizations(self, params, result, theme: str = "light") -> None:
         self._current_params = params
