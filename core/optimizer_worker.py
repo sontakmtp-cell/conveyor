@@ -33,9 +33,52 @@ class OptimizerWorker(QObject):
             self.status.emit("🔧 Khởi tạo bộ tối ưu hóa...")
             optimizer = Optimizer(self.base_params, self.opt_settings)
             
-            # Chạy tối ưu với tham số giảm để tránh quá tải
-            self.status.emit("⚡ Đang chạy thuật toán di truyền...")
-            results = optimizer.run(generations=30, population_size=50)
+            # Cải thiện BƯỚC 6: Điều chỉnh parameters trong OptimizerWorker
+            # Tính toán parameters dựa trên độ phức tạp của bài toán
+            base_width = self.base_params.B_mm
+            capacity = self.base_params.Qt_tph
+            
+            # Điều chỉnh population_size dựa trên độ phức tạp
+            if capacity > 1000 or base_width > 1200:
+                # Bài toán phức tạp: tăng population và generations
+                population_size = 80
+                generations = 40
+                self.status.emit("📊 Bài toán phức tạp - Sử dụng population lớn và nhiều thế hệ")
+            elif capacity > 500 or base_width > 800:
+                # Bài toán trung bình
+                population_size = 60
+                generations = 35
+                self.status.emit("📊 Bài toán trung bình - Sử dụng tham số cân bằng")
+            else:
+                # Bài toán đơn giản: giảm để tăng tốc độ
+                population_size = 40
+                generations = 30
+                self.status.emit("📊 Bài toán đơn giản - Sử dụng tham số tối ưu cho tốc độ")
+            
+            # Điều chỉnh mutation_rate dựa trên số thế hệ
+            if generations > 35:
+                mutation_rate = 0.15  # Tăng mutation cho nhiều thế hệ
+            elif generations > 25:
+                mutation_rate = 0.12  # Mutation vừa phải
+            else:
+                mutation_rate = 0.10  # Mutation thấp cho ít thế hệ
+            
+            # Điều chỉnh tournament_size dựa trên population_size
+            tournament_size = max(3, min(8, population_size // 10))
+            
+            # Điều chỉnh elitism_count (sẽ được tự động tính trong optimizer)
+            elitism_count = 0  # Để optimizer tự động tính toán
+            
+            self.status.emit(f"⚡ Đang chạy thuật toán di truyền với {generations} thế hệ, {population_size} cá thể...")
+            self.status.emit(f"🔧 Tham số: mutation_rate={mutation_rate:.2f}, tournament_size={tournament_size}")
+            
+            results = optimizer.run(
+                generations=generations, 
+                population_size=population_size,
+                mutation_rate=mutation_rate,
+                tournament_size=tournament_size,
+                elitism_count=elitism_count
+            )
             
             if results:
                 self.status.emit(f"✅ Tối ưu hóa hoàn tất! Tìm thấy {len(results)} giải pháp hợp lệ.")

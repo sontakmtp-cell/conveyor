@@ -543,8 +543,8 @@ class Enhanced3DConveyorWindow(QMainWindow):
         # Tính năng tối ưu hóa nâng cao giờ đây luôn được bật mặc định
         # Không cần kiểm tra opt_group.isChecked() nữa
 
-        # Hiển thị thông báo "Đang quét vô hạn kết quả, hãy kiên nhẫn chờ đợi !!" trong label trạng thái
-        self.inputs.lbl_optimization_status.setText("🔄 Đang quét vô hạn kết quả, hãy kiên nhẫn chờ đợi !!")
+        # Hiển thị thông báo "Đang chạy thuật toán di truyền, hãy kiên nhẫn chờ đợi !!" trong label trạng thái
+        self.inputs.lbl_optimization_status.setText("🔄 Đang chạy thuật toán di truyền, hãy kiên nhẫn chờ đợi !!")
         self.inputs.lbl_optimization_status.setStyleSheet("""
             QLabel {
                 color: #dc2626;

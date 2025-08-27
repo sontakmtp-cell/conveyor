@@ -55,7 +55,8 @@ def get_max_speed_from_table(belt_width_mm: int, material_characteristics: dict)
         
         if not os.path.exists(csv_path):
             print(f"Warning: Không tìm thấy file bảng tra tốc độ: {csv_path}")
-            return 5.0  # Giá trị mặc định an toàn
+            print("Sử dụng giá trị fallback an toàn: 2.0 m/s")
+            return 2.0  # Giá trị fallback an toàn hơn (thay vì 5.0)
         
         # Đọc file CSV
         df = pd.read_csv(csv_path)
@@ -63,7 +64,9 @@ def get_max_speed_from_table(belt_width_mm: int, material_characteristics: dict)
         # Tìm bề rộng băng gần nhất
         available_widths = df['conveyor width (mm)'].dropna().tolist()
         if not available_widths:
-            return 5.0
+            print("Warning: Không có dữ liệu bề rộng băng trong file CSV")
+            print("Sử dụng giá trị fallback an toàn: 2.0 m/s")
+            return 2.0  # Giá trị fallback an toàn hơn
         
         # Tìm bề rộng gần nhất (có thể nhỏ hơn hoặc bằng)
         belt_width_mm = int(belt_width_mm)
@@ -76,7 +79,9 @@ def get_max_speed_from_table(belt_width_mm: int, material_characteristics: dict)
                 continue
         
         if not valid_widths:
-            return 5.0  # Giá trị mặc định an toàn
+            print("Warning: Không có bề rộng băng hợp lệ trong file CSV")
+            print("Sử dụng giá trị fallback an toàn: 2.0 m/s")
+            return 2.0  # Giá trị fallback an toàn hơn
         
         closest_width = min(valid_widths, key=lambda x: abs(x - belt_width_mm))
         
@@ -108,14 +113,19 @@ def get_max_speed_from_table(belt_width_mm: int, material_characteristics: dict)
                         max_speed = row[col].iloc[0]
                         break
                 else:
-                    max_speed = 5.0  # Giá trị mặc định an toàn
+                    print("Warning: Không có dữ liệu tốc độ trong file CSV")
+                    print("Sử dụng giá trị fallback an toàn: 2.0 m/s")
+                    max_speed = 2.0  # Giá trị fallback an toàn hơn
             return float(max_speed)
         
-        return 5.0  # Giá trị mặc định
+        print("Warning: Không tìm thấy dữ liệu cho bề rộng băng")
+        print("Sử dụng giá trị fallback an toàn: 2.0 m/s")
+        return 2.0  # Giá trị fallback an toàn hơn
         
     except Exception as e:
         print(f"Warning: Lỗi khi đọc bảng tra tốc độ: {e}")
-        return 5.0  # Giá trị mặc định an toàn
+        print("Sử dụng giá trị fallback an toàn: 2.0 m/s")
+        return 2.0  # Giá trị fallback an toàn hơn
 
 def calculate_belt_speed(capacity_tph: float, density_tpm3: float, belt_width_mm: int, 
                          particle_mm: float, material_name: str, trough_angle_deg: float = 20.0, 
@@ -161,8 +171,15 @@ def calculate_belt_speed(capacity_tph: float, density_tpm3: float, belt_width_mm
     v_rec = optimize_speed(material_name, particle_mm, belt_width_mm)
     
     # 6) Lấy tốc độ tối đa cho phép từ bảng tra
+    # Cải thiện: Luôn đảm bảo material_characteristics có giá trị
     if material_characteristics is None:
-        material_characteristics = {}
+        print("Warning: material_characteristics không được truyền, sử dụng giá trị mặc định an toàn")
+        material_characteristics = {
+            'is_abrasive': True,  # Mặc định: vật liệu hạt (an toàn nhất)
+            'is_corrosive': False,
+            'is_dusty': False
+        }
+    
     max_speed_allowed = get_max_speed_from_table(belt_width_mm, material_characteristics)
     
     # 7) So sánh và đưa ra cảnh báo

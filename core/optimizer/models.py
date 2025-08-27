@@ -15,6 +15,7 @@ class DesignCandidate:
     is_valid: bool = False # Thiết kế có hợp lệ không (ví dụ: có tìm được bộ truyền động không)
     fitness_score: float = float('inf') # Điểm E, càng thấp càng tốt
     calculation_result: CalculationResult | None = None # Kết quả chi tiết từ core.engine
+    invalid_reasons: list = field(default_factory=list) # Danh sách lý do không hợp lệ
 
 @dataclass
 class OptimizerSettings:
