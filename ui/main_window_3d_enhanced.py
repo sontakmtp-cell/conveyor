@@ -270,10 +270,14 @@ class Enhanced3DConveyorWindow(QMainWindow):
         # --- [BẮT ĐẦU THÊM MỚI] ---
         act_manual = QAction("📖 Hướng dẫn sử dụng", self)
         act_manual.triggered.connect(self._show_user_manual)
+        
+        act_genetic = QAction("🧬 Thuật toán di truyền", self)
+        act_genetic.triggered.connect(self._show_genetic_algorithm_info)
         # --- [KẾT THÚC THÊM MỚI] ---
         
         m_help.addAction(act_about)
         m_help.addAction(act_manual) # Thêm mục mới vào menu
+        m_help.addAction(act_genetic) # Thêm mục Thuật toán di truyền
 
     # --- [BẮT ĐẦU THÊM MỚI] ---
     def _show_user_manual(self):
@@ -348,6 +352,95 @@ class Enhanced3DConveyorWindow(QMainWindow):
         layout.addWidget(text_browser)
         manual_dialog.exec()
     # --- [KẾT THÚC THÊM MỚI] ---
+
+    def _show_genetic_algorithm_info(self):
+        """Hiển thị thông tin về Thuật toán di truyền."""
+        genetic_dialog = QDialog(self)
+        genetic_dialog.setWindowTitle("Thuật toán di truyền trong tối ưu hóa thiết kế băng tải")
+        genetic_dialog.resize(900, 800)
+        genetic_dialog.setWindowFlags(self.windowFlags() | Qt.Window)
+
+        layout = QVBoxLayout(genetic_dialog)
+        text_browser = QTextBrowser(genetic_dialog)
+        
+        # Nội dung từ file "Thuat toan di truyen.txt"
+        genetic_html = """
+        <html><body style='font-family: Segoe UI, sans-serif; font-size: 14px; line-height: 1.6; color: #333;'>
+        <h1 style='color: #2563eb; text-align: center;'>🧬 Thuật Toán Di Truyền (Genetic Algorithm) trong Tối Ưu Hóa Thiết Kế Băng Tải</h1>
+        
+        <div style='background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;'>
+        <h2 style='color: #1e40af;'>📋 Tổng Quan</h2>
+        <p>Thuật toán di truyền (GA) là một trong những tính năng cốt lõi của phần mềm <b>Conveyor Calculator AI</b>. Chức năng này cho phép tự động tìm kiếm và đề xuất phương án thiết kế băng tải tối ưu nhất về mặt chi phí, trong khi vẫn đảm bảo tất cả các yêu cầu kỹ thuật về hiệu suất và tải trọng.</p>
+        <p>Thay vì phải thử và sai qua hàng trăm tổ hợp thiết bị, GA sẽ mô phỏng quá trình tiến hóa tự nhiên để nhanh chóng hội tụ về giải pháp tốt nhất.</p>
+        </div>
+
+        <h2 style='color: #1e40af;'>⚙️ Cách Hoạt Động</h2>
+        <p>Thuật toán hoạt động dựa trên các khái niệm cơ bản của di truyền học, được áp dụng vào bài toán thiết kế kỹ thuật.</p>
+
+        <h3 style='color: #374151;'>1. Cá thể (Chromosome)</h3>
+        <p>Mỗi "cá thể" trong thuật toán là một giải pháp thiết kế băng tải hoàn chỉnh. Nó được biểu diễn dưới dạng một bộ gen (genes), trong đó mỗi gen là một thành phần hoặc thông số của băng tải.</p>
+        <p>Ví dụ, một cá thể có thể được định nghĩa bởi các gen sau:</p>
+        <ul style='background-color: #f1f5f9; padding: 20px; border-radius: 6px;'>
+            <li><b>Động cơ:</b> ID của một mẫu động cơ cụ thể trong cơ sở dữ liệu.</li>
+            <li><b>Hộp số:</b> ID của một mẫu hộp số.</li>
+            <li><b>Loại dây băng:</b> Ví dụ, 'EP200/2'.</li>
+            <li><b>Chiều rộng băng:</b> Ví dụ, 650 mm.</li>
+            <li><b>Loại con lăn:</b> ID của một mẫu con lăn.</li>
+            <li><b>Khoảng cách con lăn:</b> Ví dụ, 1200 mm.</li>
+        </ul>
+
+        <h3 style='color: #374151;'>2. Quần thể (Population)</h3>
+        <p>Thuật toán bắt đầu bằng việc tạo ra một "quần thể" ban đầu, là một tập hợp gồm nhiều cá thể (thiết kế) được tạo ra một cách ngẫu nhiên hoặc dựa trên một số quy tắc heuristic.</p>
+
+        <h3 style='color: #374151;'>3. Hàm Thích Nghi (Fitness Function)</h3>
+        <p>Đây là hàm số dùng để đánh giá "chất lượng" hay "độ tốt" của mỗi cá thể. Trong bài toán này, mục tiêu là <b>tối thiểu hóa chi phí</b>, vì vậy hàm thích nghi được định nghĩa là <b>tổng chi phí</b> của tất cả các bộ phận trong thiết kế.</p>
+        
+        <div style='background-color: #fef3c7; padding: 15px; border-radius: 6px; border-left: 4px solid #f59e0b;'>
+        <p><b>Xử lý ràng buộc:</b> Một thiết kế phải đáp ứng các yêu cầu kỹ thuật (ví dụ: công suất yêu cầu, lực căng dây băng, vận tốc). Nếu một thiết kế không đạt yêu cầu, nó sẽ bị "phạt" bằng cách gán cho nó một giá trị <code>Fitness</code> cực lớn (ví dụ: <code>infinity</code>). Điều này đảm bảo rằng các thiết kế không hợp lệ sẽ bị loại bỏ trong quá trình chọn lọc.</p>
+        </div>
+
+        <h3 style='color: #374151;'>4. Các Toán Tử Di Truyền</h3>
+        <p>Quá trình tiến hóa từ thế hệ này sang thế hệ tiếp theo được thực hiện thông qua ba toán tử chính:</p>
+
+        <h4 style='color: #4b5563;'>a. Lựa Chọn (Selection)</h4>
+        <p>Những cá thể có độ thích nghi tốt nhất (chi phí thấp nhất) sẽ có nhiều khả năng được chọn làm "cha mẹ" cho thế hệ tiếp theo. Phương pháp lựa chọn phổ biến là "Tournament Selection": chọn ngẫu nhiên một vài cá thể từ quần thể và cá thể tốt nhất trong nhóm đó sẽ được chọn.</p>
+
+        <h4 style='color: #4b5563;'>b. Lai Ghép (Crossover)</h4>
+        <p>Hai cá thể "cha mẹ" được chọn sẽ trao đổi một phần "gen" của chúng để tạo ra một hoặc hai cá thể "con".</p>
+        <ul style='background-color: #f0f9ff; padding: 15px; border-radius: 6px;'>
+            <li><b>Ví dụ:</b> Cá thể con có thể thừa hưởng động cơ từ cha và hộp số từ mẹ. Điều này giúp kết hợp những đặc tính tốt của các giải pháp khác nhau.</li>
+        </ul>
+
+        <h4 style='color: #4b5563;'>c. Đột Biến (Mutation)</h4>
+        <p>Một hoặc vài gen của một cá thể con sẽ bị thay đổi một cách ngẫu nhiên.</p>
+        <ul style='background-color: #f0f9ff; padding: 15px; border-radius: 6px;'>
+            <li><b>Ví dụ:</b> Thay đổi ngẫu nhiên loại động cơ hoặc chiều rộng băng tải.</li>
+            <li><b>Mục đích:</b> Giúp thuật toán thoát khỏi các điểm tối ưu cục bộ (local optima) và duy trì sự đa dạng trong quần thể, tạo cơ hội khám phá những giải pháp mới.</li>
+        </ul>
+
+        <h3 style='color: #374151;'>5. Kết Thúc (Termination)</h3>
+        <p>Quá trình trên (lựa chọn, lai ghép, đột biến) được lặp lại qua nhiều thế hệ. Thuật toán sẽ dừng lại khi đạt đến một trong các điều kiện sau:</p>
+        <ul style='background-color: #f1f5f9; padding: 20px; border-radius: 6px;'>
+            <li>Đã chạy hết số thế hệ được định sẵn.</li>
+            <li>Giải pháp tốt nhất không được cải thiện trong một số thế hệ liên tiếp.</li>
+        </ul>
+        <p>Kết quả cuối cùng là cá thể có độ thích nghi cao nhất (chi phí thấp nhất) được tìm thấy trong suốt quá trình chạy.</p>
+
+        <div style='background-color: #ecfdf5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;'>
+        <h3 style='color: #047857;'>🎯 Lợi Ích Của Thuật Toán Di Truyền</h3>
+        <ul>
+            <li><b>Tự động hóa:</b> Không cần thử nghiệm thủ công hàng trăm phương án</li>
+            <li><b>Tối ưu hóa:</b> Tìm ra giải pháp tốt nhất về chi phí và hiệu suất</li>
+            <li><b>Tiết kiệm thời gian:</b> Giảm đáng kể thời gian thiết kế</li>
+            <li><b>Độ tin cậy:</b> Kết quả dựa trên tính toán khoa học, không phải kinh nghiệm</li>
+        </ul>
+        </div>
+        </body></html>
+        """
+        text_browser.setHtml(genetic_html)
+        text_browser.setOpenExternalLinks(True)
+        layout.addWidget(text_browser)
+        genetic_dialog.exec()
 
     def _show_assigned_account(self):
         try:
@@ -436,7 +529,8 @@ class Enhanced3DConveyorWindow(QMainWindow):
         self.inputs.cbo_material.addItems(list(ACTIVE_MATERIAL_DB.keys()))
         self.inputs.cbo_width.addItems([str(w) for w in STANDARD_WIDTHS])
         self.inputs.cbo_width.setCurrentText("800")
-        self.inputs.cbo_belt_type.addItems(list(ACTIVE_BELT_SPECS.keys()))
+        # Belt type options are initialized in InputsPanel with proper labels.
+        # Avoid re-adding here to prevent duplicate/incorrect entries.
         # Thiết lập giá trị mặc định cho calculation_standard
         self.inputs.cbo_standard.setCurrentText("CEMA")
         self.inputs.update_drive_illustration(self.inputs.cbo_drive.currentText())
@@ -901,8 +995,8 @@ class Enhanced3DConveyorWindow(QMainWindow):
                 self.db_path = path
                 self.inputs.cbo_material.clear()
                 self.inputs.cbo_material.addItems(list(ACTIVE_MATERIAL_DB.keys()))
-                self.inputs.cbo_belt_type.clear()
-                self.inputs.cbo_belt_type.addItems(list(ACTIVE_BELT_SPECS.keys()))
+                # Belt type choices are fixed in the UI to two options
+                # (Fabric, Steel Cord). Do not clear/repopulate here.
                 self.statusBar().showMessage(report)
             except Exception as e:
                 QMessageBox.critical(self, "Lỗi CSDL", f"Không thể nạp CSDL:\n{e}")
@@ -994,4 +1088,3 @@ class Enhanced3DConveyorWindow(QMainWindow):
             Nếu thấy phần mềm hữu ích hãy mời tác giả 1 li cà phê nhé 019704070025850 HDBank</i></p>
         """
         QMessageBox.about(self, "Giới thiệu", about_text)
-

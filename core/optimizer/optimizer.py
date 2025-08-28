@@ -16,7 +16,8 @@ from core.specs import (
     ACTIVE_BELT_SPECS, 
     STANDARD_GEARBOX_RATIOS, 
     ACTIVE_CHAIN_SPECS,
-    MATERIAL_DB
+    MATERIAL_DB,
+    get_valid_ratings_for_belt_type,
 )
 
 # Cải thiện BƯỚC 6: Thiết lập logging
@@ -612,6 +613,41 @@ class Optimizer:
             params.B_mm = candidate.belt_width_mm  # Giữ nguyên bề rộng từ candidate
             params.V_mps = v_final  # Sử dụng tốc độ được tính cho chính bề rộng này
             params.belt_type = candidate.belt_type_name
+            # Ensure belt_rating_code matches the candidate belt type to use correct "cấu hình băng"
+            try:
+                base_code = getattr(self.base_params, 'belt_rating_code', None)
+                current_code = getattr(params, 'belt_rating_code', None)
+                # If belt type changed vs. base or rating code missing/empty, select a valid default for the type
+                if (candidate.belt_type_name != getattr(self.base_params, 'belt_type', None)) or (not current_code):
+                    valid_codes = []
+                    try:
+                        valid_codes = get_valid_ratings_for_belt_type(candidate.belt_type_name)
+                    except Exception:
+                        valid_codes = []
+                    chosen = None
+                    if candidate.belt_type_name == 'steel_cord':
+                        # Prefer a common ST rating if available
+                        for pref in ["ST-1600", "ST-1250", "ST-2000"]:
+                            if pref in valid_codes:
+                                chosen = pref
+                                break
+                    else:
+                        # Prefer EP family as safe default
+                        for pref in ["EP400/4", "EP500/4", "EP315/3"]:
+                            if pref in valid_codes:
+                                chosen = pref
+                                break
+                        if not chosen:
+                            # fallback to first EP-like code if exists
+                            chosen = next((c for c in valid_codes if str(c).startswith('EP')), None)
+                    if not chosen and valid_codes:
+                        chosen = valid_codes[0]
+                    # If still nothing, keep base code if it looks compatible, else leave as-is
+                    if chosen:
+                        params.belt_rating_code = chosen
+            except Exception:
+                # Non-fatal: keep whatever rating the params currently carries
+                pass
             # Chế độ manual để sử dụng gearbox_ratio của candidate
             params.gearbox_ratio_mode = "manual"
             params.gearbox_ratio_user = candidate.gearbox_ratio
@@ -633,6 +669,35 @@ class Optimizer:
             params.B_mm = candidate.belt_width_mm
             params.V_mps = 2.0  # Tốc độ mặc định an toàn (đã được cải thiện từ 5.0 m/s)
             params.belt_type = candidate.belt_type_name
+            # Ensure belt_rating_code matches the candidate belt type in fallback path as well
+            try:
+                base_code = getattr(self.base_params, 'belt_rating_code', None)
+                current_code = getattr(params, 'belt_rating_code', None)
+                if (candidate.belt_type_name != getattr(self.base_params, 'belt_type', None)) or (not current_code):
+                    valid_codes = []
+                    try:
+                        valid_codes = get_valid_ratings_for_belt_type(candidate.belt_type_name)
+                    except Exception:
+                        valid_codes = []
+                    chosen = None
+                    if candidate.belt_type_name == 'steel_cord':
+                        for pref in ["ST-1600", "ST-1250", "ST-2000"]:
+                            if pref in valid_codes:
+                                chosen = pref
+                                break
+                    else:
+                        for pref in ["EP400/4", "EP500/4", "EP315/3"]:
+                            if pref in valid_codes:
+                                chosen = pref
+                                break
+                        if not chosen:
+                            chosen = next((c for c in valid_codes if str(c).startswith('EP')), None)
+                    if not chosen and valid_codes:
+                        chosen = valid_codes[0]
+                    if chosen:
+                        params.belt_rating_code = chosen
+            except Exception:
+                pass
             params.gearbox_ratio_mode = "manual"
             params.gearbox_ratio_user = candidate.gearbox_ratio
             
@@ -645,6 +710,20 @@ class Optimizer:
         try:
             print(f"DEBUG: Evaluating candidate {candidate}")
             result = calculate(params)
+            # Propagate the belt rating code actually used into result and candidate for UI
+            try:
+                used_code = getattr(params, 'belt_rating_code', None)
+                if used_code:
+                    try:
+                        setattr(result, 'belt_rating_code_used', used_code)
+                    except Exception:
+                        pass
+                    try:
+                        setattr(candidate, 'belt_rating_code', used_code)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
             candidate.calculation_result = result
             print(f"DEBUG: Calculation completed for {candidate}")
 

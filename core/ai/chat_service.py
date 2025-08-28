@@ -44,6 +44,19 @@ def format_citations(chunks: List[tuple[Chunk, float]]) -> List[Dict]:
         for chunk, _ in chunks
     ]
 
+class _DummyProvider:
+    """Fallback provider used when GeminiProvider cannot initialize."""
+    def chat(self, system: str, messages: List[Dict]) -> str:
+        last_user = next((m.get("content") for m in reversed(messages) if m.get("role") == "user"), "")
+        return (
+            "AI features are unavailable (missing or invalid API key). "
+            "Showing a basic response. Your question was: " + last_user
+        )
+
+    async def chat_async(self, system: str, messages: List[Dict]) -> str:
+        return self.chat(system, messages)
+
+
 class ChatService:
     def __init__(self, retriever: Optional[Retriever]):
         self.retriever = retriever
@@ -53,9 +66,9 @@ class ChatService:
             self.provider = GeminiProvider()  # Will automatically get API key from environment
             print("ChatService: GeminiProvider initialized successfully")
         except Exception as e:
+            # Fallback gracefully without breaking the app
             print(f"ChatService: Failed to initialize GeminiProvider: {e}")
-            # Create a fallback provider or handle the error appropriately
-            raise RuntimeError(f"Failed to initialize AI service: {str(e)}")
+            self.provider = _DummyProvider()
     
     def ask(self, 
             question: str, 

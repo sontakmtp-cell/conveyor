@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QComboBox,
     QDoubleSpinBox, QSpinBox, QLineEdit, QPushButton, QScrollArea, QFrame,
     QTableWidget, QTableWidgetItem, QTextEdit, QTabWidget, QProgressBar, QLabel,
-    QCheckBox, QStackedWidget, QSlider, QGridLayout
+    QCheckBox, QStackedWidget, QSlider, QGridLayout, QMessageBox
 )
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtGui import QPixmap, QFont, QColor
@@ -240,25 +240,7 @@ class InputsPanel(QWidget):
         self.btn_calc = QPushButton("TÍNH TOÁN\nCHI TIẾT")
         self.btn_calc.setObjectName("primary")
         self.btn_calc.setMinimumHeight(50)  # Đảm bảo nút có chiều cao tối thiểu
-        self.btn_calc.setStyleSheet("""
-            QPushButton#primary {
-                background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #049b94, stop:1 #037d77);
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 12px 24px;
-                font-weight: bold;
-                font-size: 14px;
-                text-align: center;
-                white-space: pre-line;
-            }
-            QPushButton#primary:hover {
-                background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #05a89f, stop:1 #048a82);
-            }
-            QPushButton#primary:pressed {
-                background-color: #024e4a;
-            }
-        """)
+        self.btn_calc.setStyleSheet("")
         
         self.btn_quick = QPushButton("TÍNH TOÁN\nNHANH")
         self.btn_quick.setMinimumHeight(50)  # Đảm bảo nút có chiều cao tối thiểu
@@ -289,33 +271,18 @@ class InputsPanel(QWidget):
         
         self.btn_opt = QPushButton("TỐI ƯU\nNÂNG CAO") # Đổi tên nút
         self.btn_opt.setMinimumHeight(50)  # Đảm bảo nút có chiều cao tối thiểu
-        self.btn_opt.setStyleSheet("""
-            QPushButton {
-                background-color: #ffffff;
-                color: #374151;
-                border: 2px solid #d1d5db;
-                border-radius: 8px;
-                padding: 8px 16px;
-                font-weight: 600;
-                font-size: 13px;
-                min-height: 50px;
-                min-width: 140px;
-                margin: 5px;
-                text-align: center;
-                white-space: pre-line;
-            }
-            QPushButton:hover {
-                background-color: #f8fafc;
-                border-color: #9ca3af;
-            }
-            QPushButton:pressed {
-                background-color: #e5e7eb;
-                border-color: #6b7280;
-            }
-        """)
+        self.btn_opt.setObjectName("secondary")
+        self.btn_opt.setStyleSheet("")
         
-        btn_row.addWidget(self.btn_calc, 2)
-        btn_row.addWidget(self.btn_quick, 1)
+        # Ensure both main action buttons have equal width
+        try:
+            from PySide6.QtWidgets import QSizePolicy
+            self.btn_calc.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            self.btn_opt.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        except Exception:
+            pass
+        btn_row.addWidget(self.btn_calc, 1)
+        # btn_row.addWidget(self.btn_quick, 1)  # hidden/removed from layout
         btn_row.addWidget(self.btn_opt, 1)
         
         # Thêm CSS cho container chứa nút để đảm bảo hiển thị
@@ -334,11 +301,11 @@ class InputsPanel(QWidget):
                 color: #374151;
                 border: 2px solid #d1d5db;
                 border-radius: 8px;
-                padding: 12px 20px;
+                padding: 12px 21px; /* unified +5% horizontal padding */
                 font-weight: 600;
                 font-size: 14px;
                 min-height: 50px;
-                min-width: 120px;
+                min-width: 147px;   /* unified +5% min width */
                 margin: 5px;
             }
             QPushButton:hover {
@@ -350,18 +317,32 @@ class InputsPanel(QWidget):
                 border-color: #6b7280;
             }
             QPushButton#primary {
-                background-color: #3b82f6;
+                background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #3b82f6, stop:1 #1d4ed8);
                 color: white;
-                border-color: #3b82f6;
+                border: none; /* solid filled button */
                 font-weight: 700;
             }
             QPushButton#primary:hover {
-                background-color: #2563eb;
-                border-color: #2563eb;
+                background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2563eb, stop:1 #1e40af);
             }
             QPushButton#primary:pressed {
-                background-color: #1d4ed8;
+                background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1d4ed8, stop:1 #1e3a8a);
+            }
+            QPushButton#secondary {
+                background-color: transparent;
+                color: #2563eb;
+                border: 2px solid #3b82f6; /* outline style */
+                font-weight: 600;
+            }
+            QPushButton#secondary:hover {
+                background-color: #eff6ff;
+                border-color: #2563eb;
+                color: #2563eb;
+            }
+            QPushButton#secondary:pressed {
+                background-color: #dbeafe;
                 border-color: #1d4ed8;
+                color: #1d4ed8;
             }
         """)
         main_layout.addWidget(btn_container)
@@ -703,71 +684,124 @@ class InputsPanel(QWidget):
 
     def _update_belt_rating_options(self):
         """Cập nhật các options cho belt rating dựa trên loại băng tải và core được chọn"""
+        if getattr(self, "_updating_belt_options", False):
+            return
+        self._updating_belt_options = True
         try:
             from core.safety_factors import STEEL_CORD_STANDARD, FABRIC_STANDARD
-            
+
             belt_type = self.get_belt_type()
-            
-            if belt_type == "steel_cord":
-                # Steel cord: chỉ có ST
-                self.cbo_belt_core.clear()
-                self.cbo_belt_core.addItems(["ST"])
-                self.cbo_belt_core.setCurrentText("ST")
-                
-                # Rating: các số ST tiêu chuẩn
-                self.cbo_belt_rating.clear()
-                self.cbo_belt_rating.addItems([str(rating) for rating in STEEL_CORD_STANDARD])
-                self.cbo_belt_rating.setCurrentText("1600")  # Mặc định
-                
-                # Số lớp: không dùng cho steel cord
-                self.cbo_belt_plies.clear()
-                self.cbo_belt_plies.addItems(["1"])
-                self.cbo_belt_plies.setCurrentText("1")
-                self.cbo_belt_plies.setEnabled(False)
-                
-            else:
-                # Fabric: EP hoặc NF
-                self.cbo_belt_core.clear()
-                self.cbo_belt_core.addItems(["EP", "NF"])
-                self.cbo_belt_core.setCurrentText("EP")
-                
-                # Rating: dựa trên core được chọn
-                core = self.cbo_belt_core.currentText()
-                if core in FABRIC_STANDARD:
-                    ratings = [str(rating) for rating in FABRIC_STANDARD[core].keys()]
+
+            # Block signals while mutating dependent combos to avoid re-entrant loops
+            try:
+                self.cbo_belt_core.blockSignals(True)
+                self.cbo_belt_rating.blockSignals(True)
+                self.cbo_belt_plies.blockSignals(True)
+
+                if belt_type == "steel_cord":
+                    # Steel cord: only ST
+                    self.cbo_belt_core.clear()
+                    self.cbo_belt_core.addItems(["ST"])
+                    self.cbo_belt_core.setCurrentText("ST")
+
+                    # Ratings for ST
                     self.cbo_belt_rating.clear()
-                    self.cbo_belt_rating.addItems(ratings)
-                    self.cbo_belt_rating.setCurrentText("400")  # Mặc định
-                    
-                    # Số lớp: dựa trên rating được chọn
-                    self._update_plies_options()
-                else:
-                    self.cbo_belt_rating.clear()
+                    self.cbo_belt_rating.addItems([str(r) for r in STEEL_CORD_STANDARD])
+                    self.cbo_belt_rating.setCurrentText("1600")
+
+                    # Plies not used for steel cord
                     self.cbo_belt_plies.clear()
-                
-                self.cbo_belt_plies.setEnabled(True)
-                
+                    self.cbo_belt_plies.addItems(["1"])
+                    self.cbo_belt_plies.setCurrentText("1")
+                    self.cbo_belt_plies.setEnabled(False)
+
+                else:
+                    # Fabric: EP or NF (if available in FABRIC_STANDARD)
+                    prev_core = self.cbo_belt_core.currentText().strip().upper()
+                    available_cores = [c for c in ["EP", "NF"] if c in FABRIC_STANDARD]
+
+                    # If NF missing from tables, warn user once
+                    if "NF" not in FABRIC_STANDARD and not getattr(self, "_warned_missing_NF", False):
+                        try:
+                            QMessageBox.warning(self, "Thiếu bảng tra NF", 
+                                "Chưa có bảng tra cho Core 'NF' trong core/safety_factors.py.\n"
+                                "Vui lòng bổ sung FABRIC_STANDARD['NF'] để sử dụng Core NF.")
+                        except Exception:
+                            pass
+                        print("WARNING: FABRIC_STANDARD missing 'NF' table. Please add it to core/safety_factors.py")
+                        self._warned_missing_NF = True
+
+                    self.cbo_belt_core.clear()
+                    if available_cores:
+                        self.cbo_belt_core.addItems(available_cores)
+                        # Preserve previous selection if still valid
+                        if prev_core in available_cores:
+                            self.cbo_belt_core.setCurrentText(prev_core)
+                        else:
+                            # default to EP if available, else first
+                            self.cbo_belt_core.setCurrentText("EP" if "EP" in available_cores else available_cores[0])
+                    else:
+                        # No fabric cores available -> clear dependent fields
+                        self.cbo_belt_rating.clear()
+                        self.cbo_belt_plies.clear()
+                        return
+
+                    core = self.cbo_belt_core.currentText()
+                    if core in FABRIC_STANDARD:
+                        ratings = [str(rating) for rating in FABRIC_STANDARD[core].keys()]
+                        self.cbo_belt_rating.clear()
+                        self.cbo_belt_rating.addItems(ratings)
+                        # pick default rating if available
+                        self.cbo_belt_rating.setCurrentText("400" if "400" in ratings else ratings[0])
+
+                        # Update plies according to rating
+                        self._update_plies_options()
+                    else:
+                        self.cbo_belt_rating.clear()
+                        self.cbo_belt_plies.clear()
+
+                    self.cbo_belt_plies.setEnabled(True)
+            finally:
+                self.cbo_belt_core.blockSignals(False)
+                self.cbo_belt_rating.blockSignals(False)
+                self.cbo_belt_plies.blockSignals(False)
         except Exception as e:
             print(f"Error updating belt rating options: {e}")
+        finally:
+            self._updating_belt_options = False
 
     def _update_plies_options(self):
         """Cập nhật options cho số lớp dựa trên core và rating được chọn"""
+        if getattr(self, "_updating_plies_options", False):
+            return
+        self._updating_plies_options = True
         try:
             from core.safety_factors import FABRIC_STANDARD
-            
+
             core = self.cbo_belt_core.currentText()
-            rating = int(self.cbo_belt_rating.currentText())
-            
-            if core in FABRIC_STANDARD and rating in FABRIC_STANDARD[core]:
-                plies = FABRIC_STANDARD[core][rating]
+            # Guard: if rating is empty, skip
+            rating_text = self.cbo_belt_rating.currentText().strip()
+            if not rating_text.isdigit():
                 self.cbo_belt_plies.clear()
-                self.cbo_belt_plies.addItems([str(p) for p in plies])
-                self.cbo_belt_plies.setCurrentText(str(plies[0]))  # Chọn số lớp đầu tiên
-            else:
-                self.cbo_belt_plies.clear()
-                
+                return
+            rating = int(rating_text)
+
+            # Block signals while changing plies
+            self.cbo_belt_plies.blockSignals(True)
+            try:
+                if core in FABRIC_STANDARD and rating in FABRIC_STANDARD[core]:
+                    plies = FABRIC_STANDARD[core][rating]
+                    self.cbo_belt_plies.clear()
+                    self.cbo_belt_plies.addItems([str(p) for p in plies])
+                    self.cbo_belt_plies.setCurrentText(str(plies[0]))
+                else:
+                    self.cbo_belt_plies.clear()
+            finally:
+                self.cbo_belt_plies.blockSignals(False)
         except Exception as e:
             print(f"Error updating belt rating options: {e}")
+        finally:
+            self._updating_plies_options = False
 
     def get_belt_rating_code(self) -> str:
         """Trả về mã belt rating dưới dạng chuỗi chuẩn (ST-1600, EP400/4, etc.)"""
@@ -1468,6 +1502,9 @@ class Enhanced3DResultsPanel(QWidget):
             ("Bề rộng (mm)", "belt_width_mm"),
             ("Tốc độ tính (m/s)", "belt_speed_mps"),
             ("Loại băng", "belt_type_name"),
+            ("Core", "belt_core"),
+            ("Rating", "belt_rating_value"),
+            ("Số lớp", "belt_plies"),
             ("Tỉ số truyền hộp số", "gearbox_ratio"),
             ("Mã nhông xích", "chain_designation"),
             ("Sai số vận tốc (%)", "velocity_error_percent"),
@@ -1525,6 +1562,35 @@ class Enhanced3DResultsPanel(QWidget):
                     value = candidate.belt_type_name
                 elif param_key == "gearbox_ratio":
                     value = f"{candidate.gearbox_ratio:.2f}"
+                elif param_key in ("belt_core", "belt_rating_value", "belt_plies"):
+                    code = getattr(res, 'belt_rating_code_used', None)
+                    if not code:
+                        code = getattr(candidate, 'belt_rating_code', None)
+                    core_txt = rating_txt = plies_txt = None
+                    try:
+                        code_str = (code or "").strip().upper()
+                        if code_str.startswith("ST-"):
+                            core_txt = "ST"
+                            try:
+                                rating_txt = code_str.split("-", 1)[1]
+                            except Exception:
+                                rating_txt = None
+                            plies_txt = "1"
+                        elif "/" in code_str:
+                            head, tail = code_str.split("/", 1)
+                            letters = ''.join(ch for ch in head if ch.isalpha())
+                            digits = ''.join(ch for ch in head if ch.isdigit())
+                            core_txt = letters or None
+                            rating_txt = digits or None
+                            plies_txt = ''.join(ch for ch in tail if ch.isdigit()) or None
+                    except Exception:
+                        pass
+                    if param_key == "belt_core":
+                        value = core_txt or "N/A"
+                    elif param_key == "belt_rating_value":
+                        value = rating_txt or "N/A"
+                    else:
+                        value = plies_txt or ("1" if (getattr(candidate, 'belt_type_name', '') == 'steel_cord') else "N/A")
                 elif param_key == "chain_designation":
                     chain_designation = getattr(trans, 'chain_designation', 'N/A') if trans else 'N/A'
                     # Loại bỏ phần "(ANSI/ISO)" khỏi hiển thị

@@ -26,42 +26,19 @@ class GeminiProvider(AIProvider):
             api_key = os.getenv('AI_API_KEY')
         
         if not api_key:
-            # --- GUI Prompt for API Key ---
-            from PySide6.QtWidgets import QApplication, QInputDialog, QMessageBox
-            
-            # Ensure a QApplication instance exists
-            app = QApplication.instance() or QApplication(sys.argv)
-
-            text, ok = QInputDialog.getText(None, "Gemini API Key Required",
-                                            "Please enter your Google AI API Key:")
-            
-            if ok and text:
-                api_key = text
-                config_path = os.path.join(_get_root_dir(), 'env_config.txt')
-                try:
-                    with open(config_path, 'w') as f:
-                        f.write(f"AI_API_KEY={api_key}")
-                    QMessageBox.information(None, "API Key Saved", f"API Key has been saved to {config_path}")
-                except Exception as e:
-                    QMessageBox.warning(None, "Error Saving Key", f"Could not save API Key: {e}")
-            else:
-                QMessageBox.critical(None, "API Key Error", "An API Key is required to use the AI features. The application will now exit.")
-                sys.exit(1)
-
-        if not api_key:
-            # This part will now only be reached if the user cancels the dialog
-            raise ValueError("No API_KEY was provided. Application cannot start.")
+            # Do not show modal dialogs or exit the app here. Propagate up.
+            raise RuntimeError("AI_API_KEY is missing. Cannot initialize GeminiProvider.")
         
         try:
             genai.configure(api_key=api_key)
             self.model = genai.GenerativeModel('gemini-1.5-flash')
             print(f"GeminiProvider initialized successfully with API key: {api_key[:10]}...")
         except Exception as e:
-            # More specific error for invalid API key
-            if "API key not valid" in str(e):
-                 QMessageBox.critical(None, "Invalid API Key", "The provided API Key is not valid. Please check the key and restart the application.")
-                 sys.exit(1)
-            raise RuntimeError(f"Failed to initialize Gemini API: {str(e)}")
+            # Do not display dialogs or exit; allow caller to handle gracefully
+            msg = str(e)
+            if "API key not valid" in msg or "invalid" in msg.lower():
+                raise RuntimeError("Invalid AI API key for GeminiProvider")
+            raise RuntimeError(f"Failed to initialize Gemini API: {msg}")
         
     def embed(self, texts: List[str]) -> np.ndarray:
         """
